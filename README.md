@@ -183,7 +183,9 @@ Trained under 5 epochs, batch size 64, learning rate 0.05, clipping norm 1.0, $\
 
 ### Privacy–Utility Tradeoff Curve
 
-The generated curve ([`experiments/results/privacy_utility_curve.png`](experiments/results/privacy_utility_curve.png)) highlights:
+The generated curve ([`experiments/results/privacy_utility_curve.png`](experiments/results/privacy_utility_curve.png))
+![Privacy-Utility Curve](./experiments/results/privacy_utility_curve.png)
+highlights:
 - **Strong Privacy Regime ($\epsilon < 1.0$)**: Maintains ~89–91% accuracy down to $\epsilon \approx 0.19$, demonstrating strong utility retention for MNIST under DP-SGD.
 - **Moderate Privacy Regime ($1.0 \le \epsilon \le 10.0$)**: Accuracy plateaus at ~91.3% (within ~7.8 percentage points of the non-private baseline).
 - **Extreme Noise Regime ($\sigma \ge 3.0, \epsilon < 0.1$)**: Utility degrades noticeably (80.9% at $\sigma=3.0$, 68.5% at $\sigma=5.0$) due to heavy gradient perturbation.
