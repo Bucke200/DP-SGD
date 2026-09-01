@@ -2,5 +2,7 @@ torch
 torchvision
 opacus
 numpy
+matplotlib
+scikit-learn
 pytest
 importlib_metadata

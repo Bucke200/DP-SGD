@@ -13,6 +13,7 @@ Usage:
 
 import argparse
 import json
+import os
 import sys
 from collections import defaultdict
 
@@ -64,8 +65,26 @@ def aggregate_by_noise_multiplier(runs):
     return aggregated
 
 
-def plot_privacy_utility(baselines, dp_aggregated, output_path, show=False):
+def plot_privacy_utility(baselines, dp_aggregated, output_path, dataset_name=None, show=False):
     """Generate the privacy–utility tradeoff plot."""
+    if dataset_name is None:
+        if baselines and "dataset" in baselines[0] and baselines[0]["dataset"]:
+            dataset_name = baselines[0]["dataset"]
+        else:
+            try:
+                import config
+                dataset_name = getattr(config, "DATASET", "cifar10")
+            except ImportError:
+                dataset_name = "cifar10"
+
+    ds_str = str(dataset_name).lower()
+    if "cifar" in ds_str:
+        ds_display = "CIFAR-10"
+    elif "mnist" in ds_str:
+        ds_display = "MNIST"
+    else:
+        ds_display = str(dataset_name).upper()
+
     fig, ax = plt.subplots(figsize=(10, 6))
 
     # ── DP curve ──
@@ -126,7 +145,7 @@ def plot_privacy_utility(baselines, dp_aggregated, output_path, show=False):
     # ── Formatting ──
     ax.set_xlabel("Privacy Budget (ε)", fontsize=13)
     ax.set_ylabel("Test Accuracy (%)", fontsize=13)
-    ax.set_title("Privacy–Utility Tradeoff on MNIST (DP-SGD)", fontsize=15)
+    ax.set_title(f"Privacy–Utility Tradeoff on {ds_display} (DP-SGD)", fontsize=15)
     ax.set_xscale("log")
     ax.legend(fontsize=11, loc="lower right")
     ax.grid(True, alpha=0.3)
@@ -189,17 +208,29 @@ def print_results_table(baselines, dp_aggregated):
 
 
 def main():
+    try:
+        import config
+        default_results_dir = getattr(config, "RESULTS_DIR", "experiments/results")
+    except ImportError:
+        default_results_dir = "experiments/results"
+
+    default_input = f"{default_results_dir}/epsilon_sweep.json"
+    if not os.path.exists(default_input) and os.path.exists("experiments/results/epsilon_sweep.json"):
+        default_input = "experiments/results/epsilon_sweep.json"
+
+    default_output = f"{default_results_dir}/privacy_utility_curve.png"
+
     parser = argparse.ArgumentParser(
         description="Plot privacy–utility curves from sweep results"
     )
     parser.add_argument(
         "--input", type=str,
-        default="experiments/results/epsilon_sweep.json",
+        default=default_input,
         help="Path to epsilon_sweep.json manifest",
     )
     parser.add_argument(
         "--output", type=str,
-        default="experiments/results/privacy_utility_curve.png",
+        default=default_output,
         help="Output path for the plot image",
     )
     parser.add_argument(

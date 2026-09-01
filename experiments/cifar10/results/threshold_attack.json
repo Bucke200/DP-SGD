@@ -1,0 +1,387 @@
+{
+  "config": {
+    "dataset": "cifar10",
+    "n_members": 5000,
+    "n_nonmembers": 5000,
+    "seed": 42,
+    "member_index_file": "experiments\\cifar10\\splits\\member_indices.npy",
+    "attack": "threshold",
+    "signals": [
+      "loss",
+      "confidence",
+      "mentr"
+    ]
+  },
+  "results": [
+    {
+      "checkpoint": "experiments\\cifar10\\checkpoints\\baseline_seed42.pt",
+      "label": "baseline (no DP)",
+      "epsilon": null,
+      "noise_multiplier": 0.0,
+      "seed": 42,
+      "test_accuracy": 50.96,
+      "member_accuracy": 1.0,
+      "nonmember_accuracy": 0.5070000290870667,
+      "generalization_gap": 0.49299997091293335,
+      "attacks": {
+        "loss": {
+          "auc": 0.85345658,
+          "attack_accuracy": 0.8507,
+          "best_threshold": -0.0013321106089279056,
+          "tpr_at_fpr_0.001": 0.002866995073891626,
+          "tpr_at_fpr_0.01": 0.02866995073891626,
+          "tpr_at_fpr_0.1": 0.28845957446808507
+        },
+        "confidence": {
+          "auc": 0.85345658,
+          "attack_accuracy": 0.8507,
+          "best_threshold": 0.9986687898635864,
+          "tpr_at_fpr_0.001": 0.002866995073891626,
+          "tpr_at_fpr_0.01": 0.02866995073891626,
+          "tpr_at_fpr_0.1": 0.28845957446808507
+        },
+        "mentr": {
+          "auc": 0.8611146999999999,
+          "attack_accuracy": 0.8509,
+          "best_threshold": -2.86102294921875e-06,
+          "tpr_at_fpr_0.001": 0.0036154446177847116,
+          "tpr_at_fpr_0.01": 0.03615444617784712,
+          "tpr_at_fpr_0.1": 0.36154446177847116
+        }
+      }
+    },
+    {
+      "checkpoint": "experiments\\cifar10\\checkpoints\\dp_nm_0.30_seed42.pt",
+      "label": "eps=193.50",
+      "epsilon": 193.497362,
+      "noise_multiplier": 0.3,
+      "seed": 42,
+      "test_accuracy": 37.42,
+      "member_accuracy": 0.39480000734329224,
+      "nonmember_accuracy": 0.3799999952316284,
+      "generalization_gap": 0.014800012111663818,
+      "attacks": {
+        "loss": {
+          "auc": 0.5150975,
+          "attack_accuracy": 0.5163,
+          "best_threshold": -1.9353504180908203,
+          "tpr_at_fpr_0.001": 0.0012,
+          "tpr_at_fpr_0.01": 0.0102,
+          "tpr_at_fpr_0.1": 0.121
+        },
+        "confidence": {
+          "auc": 0.5150975,
+          "attack_accuracy": 0.5163,
+          "best_threshold": 0.14437367022037506,
+          "tpr_at_fpr_0.001": 0.0012,
+          "tpr_at_fpr_0.01": 0.0102,
+          "tpr_at_fpr_0.1": 0.121
+        },
+        "mentr": {
+          "auc": 0.5157194,
+          "attack_accuracy": 0.5156000000000001,
+          "best_threshold": -1.83052659034729,
+          "tpr_at_fpr_0.001": 0.0007407407407407407,
+          "tpr_at_fpr_0.01": 0.0114,
+          "tpr_at_fpr_0.1": 0.1198
+        }
+      }
+    },
+    {
+      "checkpoint": "experiments\\cifar10\\checkpoints\\dp_nm_0.50_seed42.pt",
+      "label": "eps=32.53",
+      "epsilon": 32.526847,
+      "noise_multiplier": 0.5,
+      "seed": 42,
+      "test_accuracy": 37.26,
+      "member_accuracy": 0.3921999931335449,
+      "nonmember_accuracy": 0.37720000743865967,
+      "generalization_gap": 0.014999985694885254,
+      "attacks": {
+        "loss": {
+          "auc": 0.5146316200000001,
+          "attack_accuracy": 0.516,
+          "best_threshold": -2.13093638420105,
+          "tpr_at_fpr_0.001": 0.0012,
+          "tpr_at_fpr_0.01": 0.0092,
+          "tpr_at_fpr_0.1": 0.1188
+        },
+        "confidence": {
+          "auc": 0.5146316200000001,
+          "attack_accuracy": 0.516,
+          "best_threshold": 0.11872606724500656,
+          "tpr_at_fpr_0.001": 0.0012,
+          "tpr_at_fpr_0.01": 0.0092,
+          "tpr_at_fpr_0.1": 0.1188
+        },
+        "mentr": {
+          "auc": 0.51471926,
+          "attack_accuracy": 0.5154,
+          "best_threshold": -2.2165510654449463,
+          "tpr_at_fpr_0.001": 0.0008,
+          "tpr_at_fpr_0.01": 0.0092,
+          "tpr_at_fpr_0.1": 0.1194
+        }
+      }
+    },
+    {
+      "checkpoint": "experiments\\cifar10\\checkpoints\\dp_nm_0.70_seed42.pt",
+      "label": "eps=11.29",
+      "epsilon": 11.285083,
+      "noise_multiplier": 0.7,
+      "seed": 42,
+      "test_accuracy": 37.28,
+      "member_accuracy": 0.3885999917984009,
+      "nonmember_accuracy": 0.3747999966144562,
+      "generalization_gap": 0.013799995183944702,
+      "attacks": {
+        "loss": {
+          "auc": 0.51286602,
+          "attack_accuracy": 0.5155000000000001,
+          "best_threshold": -1.8539265394210815,
+          "tpr_at_fpr_0.001": 0.0018,
+          "tpr_at_fpr_0.01": 0.009,
+          "tpr_at_fpr_0.1": 0.114
+        },
+        "confidence": {
+          "auc": 0.51286602,
+          "attack_accuracy": 0.5155000000000001,
+          "best_threshold": 0.15662097930908203,
+          "tpr_at_fpr_0.001": 0.0018,
+          "tpr_at_fpr_0.01": 0.009,
+          "tpr_at_fpr_0.1": 0.114
+        },
+        "mentr": {
+          "auc": 0.5127951799999999,
+          "attack_accuracy": 0.516,
+          "best_threshold": -1.8422468900680542,
+          "tpr_at_fpr_0.001": 0.0011176470588235294,
+          "tpr_at_fpr_0.01": 0.0092,
+          "tpr_at_fpr_0.1": 0.115
+        }
+      }
+    },
+    {
+      "checkpoint": "experiments\\cifar10\\checkpoints\\dp_nm_0.90_seed42.pt",
+      "label": "eps=6.05",
+      "epsilon": 6.049802,
+      "noise_multiplier": 0.9,
+      "seed": 42,
+      "test_accuracy": 37.2,
+      "member_accuracy": 0.38359999656677246,
+      "nonmember_accuracy": 0.37459999322891235,
+      "generalization_gap": 0.009000003337860107,
+      "attacks": {
+        "loss": {
+          "auc": 0.51239316,
+          "attack_accuracy": 0.5126,
+          "best_threshold": -2.236846923828125,
+          "tpr_at_fpr_0.001": 0.0018,
+          "tpr_at_fpr_0.01": 0.0092,
+          "tpr_at_fpr_0.1": 0.1138
+        },
+        "confidence": {
+          "auc": 0.51239316,
+          "attack_accuracy": 0.5126,
+          "best_threshold": 0.10679470747709274,
+          "tpr_at_fpr_0.001": 0.0018,
+          "tpr_at_fpr_0.01": 0.0092,
+          "tpr_at_fpr_0.1": 0.1138
+        },
+        "mentr": {
+          "auc": 0.5122051200000001,
+          "attack_accuracy": 0.5143,
+          "best_threshold": -2.0169496536254883,
+          "tpr_at_fpr_0.001": 0.00105,
+          "tpr_at_fpr_0.01": 0.0092,
+          "tpr_at_fpr_0.1": 0.116
+        }
+      }
+    },
+    {
+      "checkpoint": "experiments\\cifar10\\checkpoints\\dp_nm_1.10_seed42.pt",
+      "label": "eps=4.09",
+      "epsilon": 4.091074,
+      "noise_multiplier": 1.1,
+      "seed": 42,
+      "test_accuracy": 37.14,
+      "member_accuracy": 0.391400009393692,
+      "nonmember_accuracy": 0.375,
+      "generalization_gap": 0.016400009393692017,
+      "attacks": {
+        "loss": {
+          "auc": 0.5108974,
+          "attack_accuracy": 0.5123,
+          "best_threshold": -2.6394217014312744,
+          "tpr_at_fpr_0.001": 0.0012,
+          "tpr_at_fpr_0.01": 0.0102,
+          "tpr_at_fpr_0.1": 0.1104
+        },
+        "confidence": {
+          "auc": 0.5108974,
+          "attack_accuracy": 0.5123,
+          "best_threshold": 0.07140254974365234,
+          "tpr_at_fpr_0.001": 0.0012,
+          "tpr_at_fpr_0.01": 0.0102,
+          "tpr_at_fpr_0.1": 0.1104
+        },
+        "mentr": {
+          "auc": 0.51085346,
+          "attack_accuracy": 0.511,
+          "best_threshold": -2.6777501106262207,
+          "tpr_at_fpr_0.001": 0.0009047619047619047,
+          "tpr_at_fpr_0.01": 0.0104,
+          "tpr_at_fpr_0.1": 0.1098
+        }
+      }
+    },
+    {
+      "checkpoint": "experiments\\cifar10\\checkpoints\\dp_nm_1.50_seed42.pt",
+      "label": "eps=2.51",
+      "epsilon": 2.511363,
+      "noise_multiplier": 1.5,
+      "seed": 42,
+      "test_accuracy": 36.05,
+      "member_accuracy": 0.3874000012874603,
+      "nonmember_accuracy": 0.3630000054836273,
+      "generalization_gap": 0.024399995803833008,
+      "attacks": {
+        "loss": {
+          "auc": 0.5150967,
+          "attack_accuracy": 0.5164,
+          "best_threshold": -1.388099193572998,
+          "tpr_at_fpr_0.001": 0.0014,
+          "tpr_at_fpr_0.01": 0.0076,
+          "tpr_at_fpr_0.1": 0.106
+        },
+        "confidence": {
+          "auc": 0.5150967,
+          "attack_accuracy": 0.5164,
+          "best_threshold": 0.24954921007156372,
+          "tpr_at_fpr_0.001": 0.0014,
+          "tpr_at_fpr_0.01": 0.0076,
+          "tpr_at_fpr_0.1": 0.106
+        },
+        "mentr": {
+          "auc": 0.51516852,
+          "attack_accuracy": 0.5163,
+          "best_threshold": -1.2166070938110352,
+          "tpr_at_fpr_0.001": 0.0008529411764705882,
+          "tpr_at_fpr_0.01": 0.0074285714285714285,
+          "tpr_at_fpr_0.1": 0.107
+        }
+      }
+    },
+    {
+      "checkpoint": "experiments\\cifar10\\checkpoints\\dp_nm_2.00_seed42.pt",
+      "label": "eps=1.71",
+      "epsilon": 1.708727,
+      "noise_multiplier": 2.0,
+      "seed": 42,
+      "test_accuracy": 31.15,
+      "member_accuracy": 0.3440000116825104,
+      "nonmember_accuracy": 0.3100000023841858,
+      "generalization_gap": 0.034000009298324585,
+      "attacks": {
+        "loss": {
+          "auc": 0.51674232,
+          "attack_accuracy": 0.518,
+          "best_threshold": -1.2340269088745117,
+          "tpr_at_fpr_0.001": 0.0012,
+          "tpr_at_fpr_0.01": 0.012,
+          "tpr_at_fpr_0.1": 0.1066
+        },
+        "confidence": {
+          "auc": 0.51674232,
+          "attack_accuracy": 0.518,
+          "best_threshold": 0.29111790657043457,
+          "tpr_at_fpr_0.001": 0.0012,
+          "tpr_at_fpr_0.01": 0.012,
+          "tpr_at_fpr_0.1": 0.1066
+        },
+        "mentr": {
+          "auc": 0.5176476,
+          "attack_accuracy": 0.5184,
+          "best_threshold": -1.3599694967269897,
+          "tpr_at_fpr_0.001": 0.001121951219512195,
+          "tpr_at_fpr_0.01": 0.012199999999999999,
+          "tpr_at_fpr_0.1": 0.1076
+        }
+      }
+    },
+    {
+      "checkpoint": "experiments\\cifar10\\checkpoints\\dp_nm_3.00_seed42.pt",
+      "label": "eps=1.05",
+      "epsilon": 1.046994,
+      "noise_multiplier": 3.0,
+      "seed": 42,
+      "test_accuracy": 19.97,
+      "member_accuracy": 0.20800000429153442,
+      "nonmember_accuracy": 0.20640000700950623,
+      "generalization_gap": 0.0015999972820281982,
+      "attacks": {
+        "loss": {
+          "auc": 0.50228784,
+          "attack_accuracy": 0.5064,
+          "best_threshold": -0.6024828553199768,
+          "tpr_at_fpr_0.001": 0.0012,
+          "tpr_at_fpr_0.01": 0.0112,
+          "tpr_at_fpr_0.1": 0.1062
+        },
+        "confidence": {
+          "auc": 0.50228784,
+          "attack_accuracy": 0.5064,
+          "best_threshold": 0.5474507212638855,
+          "tpr_at_fpr_0.001": 0.0012,
+          "tpr_at_fpr_0.01": 0.0112,
+          "tpr_at_fpr_0.1": 0.1062
+        },
+        "mentr": {
+          "auc": 0.50087612,
+          "attack_accuracy": 0.5055000000000001,
+          "best_threshold": -6.164270877838135,
+          "tpr_at_fpr_0.001": 0.0011333333333333334,
+          "tpr_at_fpr_0.01": 0.0108,
+          "tpr_at_fpr_0.1": 0.1078
+        }
+      }
+    },
+    {
+      "checkpoint": "experiments\\cifar10\\checkpoints\\dp_nm_5.00_seed42.pt",
+      "label": "eps=0.59",
+      "epsilon": 0.588783,
+      "noise_multiplier": 5.0,
+      "seed": 42,
+      "test_accuracy": 15.47,
+      "member_accuracy": 0.1687999963760376,
+      "nonmember_accuracy": 0.15459999442100525,
+      "generalization_gap": 0.014200001955032349,
+      "attacks": {
+        "loss": {
+          "auc": 0.5048471800000001,
+          "attack_accuracy": 0.5091,
+          "best_threshold": -26.435176849365234,
+          "tpr_at_fpr_0.001": 0.001066390041493776,
+          "tpr_at_fpr_0.01": 0.01066390041493776,
+          "tpr_at_fpr_0.1": 0.106175
+        },
+        "confidence": {
+          "auc": 0.5078456400000001,
+          "attack_accuracy": 0.5091,
+          "best_threshold": 3.3063480339018403e-12,
+          "tpr_at_fpr_0.001": 0.001066390041493776,
+          "tpr_at_fpr_0.01": 0.01066390041493776,
+          "tpr_at_fpr_0.1": 0.106175
+        },
+        "mentr": {
+          "auc": 0.50154872,
+          "attack_accuracy": 0.5079,
+          "best_threshold": -12.377978324890137,
+          "tpr_at_fpr_0.001": 0.0010907643312101914,
+          "tpr_at_fpr_0.01": 0.010907643312101914,
+          "tpr_at_fpr_0.1": 0.10907643312101914
+        }
+      }
+    }
+  ]
+}

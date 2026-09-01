@@ -1,7 +1,7 @@
 """
 Objective 2: Multi-ε Sweep with Model Checkpointing
 
-Trains the SampleCNN under multiple noise multipliers to produce
+Trains the model under multiple noise multipliers to produce
 a collection of models at different privacy levels. Each model's
 weights and full experimental metadata are saved as checkpoints
 for downstream MIA evaluation (Objective 3).
@@ -27,8 +27,8 @@ import torch
 import torch.nn.functional as F
 from opacus import PrivacyEngine
 
-from src.dataset import get_mnist_loaders
-from src.model import SampleCNN
+from src.data_split import get_data_loaders
+from src.model import get_model
 from src.evaluate import evaluate
 from src.utils import seed_everything, get_device
 import config
@@ -38,8 +38,8 @@ import config
 # Higher noise_multiplier → lower ε (stronger privacy, worse accuracy)
 NOISE_MULTIPLIERS = [0.3, 0.5, 0.7, 0.9, 1.1, 1.5, 2.0, 3.0, 5.0]
 
-CHECKPOINT_DIR = "experiments/checkpoints"
-RESULTS_DIR = "experiments/results"
+CHECKPOINT_DIR = getattr(config, "CHECKPOINT_DIR", "experiments/checkpoints")
+RESULTS_DIR = getattr(config, "RESULTS_DIR", "experiments/results")
 
 
 # ── Checkpoint I/O ───────────────────────────────────────────────
@@ -50,7 +50,7 @@ def save_checkpoint(model, metadata, path):
 
     Opacus wraps the model inside GradSampleModule, so we unwrap
     via `_module` to get a state_dict that loads directly into a
-    clean SampleCNN() — no Opacus dependency at inference time.
+    clean model instance — no Opacus dependency at inference time.
     """
     if hasattr(model, "_module"):
         state_dict = model._module.state_dict()
@@ -61,9 +61,9 @@ def save_checkpoint(model, metadata, path):
 
 
 def load_checkpoint(path, device):
-    """Load a checkpoint into a clean SampleCNN for verification."""
+    """Load a checkpoint into a clean model instance for verification."""
     ckpt = torch.load(path, map_location=device, weights_only=False)
-    model = SampleCNN().to(device)
+    model = get_model().to(device)
     model.load_state_dict(ckpt["model_state_dict"])
     model.eval()
     return model, ckpt
@@ -74,9 +74,9 @@ def load_checkpoint(path, device):
 def train_baseline(seed, device):
     """Train a standard SGD model (no privacy)."""
     seed_everything(seed)
-    train_loader, test_loader = get_mnist_loaders(config.BATCH_SIZE)
+    train_loader, test_loader, _ = get_data_loaders(seed=seed)
 
-    model = SampleCNN().to(device)
+    model = get_model().to(device)
     optimizer = torch.optim.SGD(model.parameters(), lr=config.LEARNING_RATE)
 
     start = time.time()
@@ -93,6 +93,7 @@ def train_baseline(seed, device):
     test_loss, test_acc = evaluate(model, test_loader, device)
 
     metadata = {
+        "dataset": config.DATASET,
         "model_type": "baseline",
         "epsilon": "inf",
         "delta": None,
@@ -112,9 +113,9 @@ def train_baseline(seed, device):
 def train_dp(noise_multiplier, seed, device):
     """Train a DP-SGD model with a given noise multiplier."""
     seed_everything(seed)
-    train_loader, test_loader = get_mnist_loaders(config.BATCH_SIZE)
+    train_loader, test_loader, _ = get_data_loaders(seed=seed)
 
-    model = SampleCNN().to(device)
+    model = get_model().to(device)
     optimizer = torch.optim.SGD(model.parameters(), lr=config.LEARNING_RATE)
 
     privacy_engine = PrivacyEngine()
@@ -144,6 +145,7 @@ def train_dp(noise_multiplier, seed, device):
     test_loss, test_acc = evaluate(model, test_loader, device)
 
     metadata = {
+        "dataset": config.DATASET,
         "model_type": "dp-sgd",
         "epsilon": round(epsilon, 6),
         "delta": config.DELTA,
@@ -184,8 +186,11 @@ def run_sweep(seeds):
     device = get_device()
     all_results = []
 
-    os.makedirs(CHECKPOINT_DIR, exist_ok=True)
-    os.makedirs(RESULTS_DIR, exist_ok=True)
+    checkpoint_dir = getattr(config, "CHECKPOINT_DIR", CHECKPOINT_DIR)
+    results_dir = getattr(config, "RESULTS_DIR", RESULTS_DIR)
+
+    os.makedirs(checkpoint_dir, exist_ok=True)
+    os.makedirs(results_dir, exist_ok=True)
 
     total_runs = len(seeds) * (1 + len(NOISE_MULTIPLIERS))
     run_idx = 0
@@ -196,7 +201,7 @@ def run_sweep(seeds):
         print(f"\n[{run_idx}/{total_runs}] Baseline (seed={seed})...")
         model, meta = train_baseline(seed, device)
 
-        ckpt_path = os.path.join(CHECKPOINT_DIR, baseline_ckpt_name(seed))
+        ckpt_path = os.path.join(checkpoint_dir, baseline_ckpt_name(seed))
         save_checkpoint(model, meta, ckpt_path)
         meta["checkpoint"] = ckpt_path
         all_results.append(meta)
@@ -210,25 +215,26 @@ def run_sweep(seeds):
                   f"DP-SGD nm={nm} (seed={seed})...")
             model, meta = train_dp(nm, seed, device)
 
-            ckpt_path = os.path.join(CHECKPOINT_DIR, dp_ckpt_name(nm, seed))
+            ckpt_path = os.path.join(checkpoint_dir, dp_ckpt_name(nm, seed))
             save_checkpoint(model, meta, ckpt_path)
             meta["checkpoint"] = ckpt_path
             all_results.append(meta)
-            print(f"  ε={meta['epsilon']:.4f}  "
+            print(f"  eps={meta['epsilon']:.4f}  "
                   f"Acc={meta['test_accuracy']:.2f}%  "
                   f"Time={meta['training_time_sec']}s  -> {ckpt_path}")
 
     # ── Save manifest ──
-    manifest_path = os.path.join(RESULTS_DIR, "epsilon_sweep.json")
+    manifest_path = os.path.join(results_dir, "epsilon_sweep.json")
     with open(manifest_path, "w") as f:
         json.dump(all_results, f, indent=2)
 
     print(f"\n{'=' * 60}")
     print(f"Sweep complete: {len(all_results)} models trained and saved")
+    print(f"  Dataset:     {config.DATASET}")
     print(f"  Seeds:       {seeds}")
     print(f"  Multipliers: {NOISE_MULTIPLIERS}")
     print(f"  Manifest:    {manifest_path}")
-    print(f"  Checkpoints: {CHECKPOINT_DIR}/")
+    print(f"  Checkpoints: {checkpoint_dir}/")
 
 
 # ── CLI ──────────────────────────────────────────────────────────
@@ -245,7 +251,7 @@ def main():
     args = parser.parse_args()
 
     print("=" * 60)
-    print("DP-SGD Epsilon Sweep")
+    print(f"DP-SGD Epsilon Sweep [{config.DATASET.upper()}]")
     print(f"  Noise multipliers: {NOISE_MULTIPLIERS}")
     print(f"  Seeds: {args.seeds}")
     print(f"  Runs per seed: 1 baseline + {len(NOISE_MULTIPLIERS)} DP")

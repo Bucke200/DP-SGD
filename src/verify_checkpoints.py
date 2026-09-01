@@ -1,5 +1,5 @@
 """
-Verify all saved checkpoints load correctly into a clean SampleCNN.
+Verify all saved checkpoints load correctly into a clean model instance.
 
 This is Step 5 of the Objective 2 workflow — run this BEFORE moving
 to Objective 3 (MIA) to confirm every checkpoint is usable.
@@ -17,20 +17,21 @@ if hasattr(sys.stdout, "reconfigure"):
 
 import torch
 
-from src.dataset import get_mnist_loaders
-from src.model import SampleCNN
+import config
+from src.data_split import get_data_loaders
+from src.model import get_model
 from src.evaluate import evaluate
 from src.utils import get_device
 
 
 def verify_single_checkpoint(ckpt_path, test_loader, device):
     """
-    Load a checkpoint into a clean SampleCNN, run evaluation,
+    Load a checkpoint into a clean model instance, run evaluation,
     and compare against the stored metadata.
     """
     ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
 
-    model = SampleCNN().to(device)
+    model = get_model().to(device)
     model.load_state_dict(ckpt["model_state_dict"])
     model.eval()
 
@@ -61,20 +62,25 @@ def verify_single_checkpoint(ckpt_path, test_loader, device):
 
 
 def main():
-    manifest_path = "experiments/results/epsilon_sweep.json"
+    manifest_path = os.path.join(config.RESULTS_DIR, "epsilon_sweep.json")
 
+    # Fallback to legacy path if dataset-scoped file does not exist yet
     if not os.path.exists(manifest_path):
-        print(f"Manifest not found: {manifest_path}")
-        print("Run the sweep first: python -m src.sweep_epsilon")
-        sys.exit(1)
+        legacy_manifest = "experiments/results/epsilon_sweep.json"
+        if os.path.exists(legacy_manifest):
+            manifest_path = legacy_manifest
+        else:
+            print(f"Manifest not found: {manifest_path}")
+            print("Run the sweep first: python -m src.sweep_epsilon")
+            sys.exit(1)
 
     with open(manifest_path) as f:
         results = json.load(f)
 
     device = get_device()
-    _, test_loader = get_mnist_loaders(batch_size=64)
+    _, test_loader, _ = get_data_loaders(batch_size=64)
 
-    print(f"Verifying {len(results)} checkpoints...\n")
+    print(f"Verifying {len(results)} checkpoints [{config.DATASET.upper()}]...\n")
 
     passed = 0
     failed = 0
@@ -83,9 +89,13 @@ def main():
         ckpt_path = entry["checkpoint"]
 
         if not os.path.exists(ckpt_path):
-            print(f"  MISSING  {ckpt_path}")
-            failed += 1
-            continue
+            candidate = os.path.join(config.CHECKPOINT_DIR, os.path.basename(ckpt_path))
+            if os.path.exists(candidate):
+                ckpt_path = candidate
+            else:
+                print(f"  MISSING  {ckpt_path}")
+                failed += 1
+                continue
 
         try:
             result = verify_single_checkpoint(ckpt_path, test_loader, device)

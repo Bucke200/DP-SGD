@@ -1,0 +1,46 @@
+{
+  "model_type": "ablation-clip-only",
+  "dataset": "cifar10",
+  "epsilon": "inf",
+  "delta": null,
+  "noise_multiplier": 0.0,
+  "max_grad_norm": 1.0,
+  "epochs": 50,
+  "batch_size": 64,
+  "learning_rate": 0.05,
+  "seed": 42,
+  "test_accuracy": 36.1,
+  "test_loss": 2.0613059401512146,
+  "final_train_loss": 1.8996884422356093,
+  "training_time_sec": 259.89,
+  "checkpoint": "experiments/cifar10/checkpoints\\ablation_clip_1.00_nm_0.00_seed42.pt",
+  "member_accuracy": 0.3903999924659729,
+  "nonmember_accuracy": 0.3684000074863434,
+  "generalization_gap": 0.021999984979629517,
+  "attacks": {
+    "loss": {
+      "auc": 0.51754188,
+      "attack_accuracy": 0.5165,
+      "best_threshold": -1.8633060455322266,
+      "tpr_at_fpr_0.001": 0.0012,
+      "tpr_at_fpr_0.01": 0.0086,
+      "tpr_at_fpr_0.1": 0.1118
+    },
+    "confidence": {
+      "auc": 0.51754188,
+      "attack_accuracy": 0.5165,
+      "best_threshold": 0.15515881776809692,
+      "tpr_at_fpr_0.001": 0.0012,
+      "tpr_at_fpr_0.01": 0.0086,
+      "tpr_at_fpr_0.1": 0.1118
+    },
+    "mentr": {
+      "auc": 0.5170447,
+      "attack_accuracy": 0.5158,
+      "best_threshold": -1.7682515382766724,
+      "tpr_at_fpr_0.001": 0.0009705882352941176,
+      "tpr_at_fpr_0.01": 0.008371428571428573,
+      "tpr_at_fpr_0.1": 0.1124
+    }
+  }
+}

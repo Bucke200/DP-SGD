@@ -5,13 +5,13 @@ import torch.optim as optim
 
 import config
 from src.utils import set_seed, get_device
-from src.dataset import get_mnist_dataloaders
-from src.model import SampleCNN, validate_model_for_opacus
+from src.data_split import get_data_loaders
+from src.model import get_model, validate_model_for_opacus
 from src.evaluate import evaluate
 
 
 def run_baseline_training():
-    """Run baseline standard PyTorch SGD training on MNIST."""
+    """Run baseline standard PyTorch SGD training."""
     print("=" * 60)
     print("STARTING BASELINE TRAINING (Non-DP SGD)")
     print("=" * 60)
@@ -20,16 +20,12 @@ def run_baseline_training():
     device = get_device()
     print(f"Device: {device}")
 
-    # 1. Dataset loading
-    train_loader, test_loader = get_mnist_dataloaders(
-        data_dir=config.DATA_DIR,
-        batch_size=config.BATCH_SIZE,
-        test_batch_size=config.TEST_BATCH_SIZE
-    )
+    # 1. Dataset loading (subsampled for MIA signal)
+    train_loader, test_loader, member_indices = get_data_loaders()
     print(f"Dataset loaded: {len(train_loader.dataset)} train samples, {len(test_loader.dataset)} test samples.")
 
     # 2. Model initialization & Opacus compatibility validation
-    model = SampleCNN().to(device)
+    model = get_model().to(device)
     is_valid, errors = validate_model_for_opacus(model)
     print(f"Opacus ModuleValidator check: is_valid={is_valid}, errors={errors}")
 
@@ -66,8 +62,8 @@ def run_baseline_training():
 
     print("\nBaseline Training Complete")
     print("--------------------------")
-    print(f"Dataset: MNIST")
-    print(f"Model: SampleCNN")
+    print(f"Dataset: {config.DATASET}")
+    print(f"Model: {model.__class__.__name__}")
     print(f"Optimizer: SGD")
     print(f"Epochs: {config.EPOCHS}")
     print(f"Batch Size: {config.BATCH_SIZE}")

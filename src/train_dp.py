@@ -1,4 +1,9 @@
+import sys
 import time
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -7,13 +12,13 @@ from opacus.validators import ModuleValidator
 
 import config
 from src.utils import set_seed, get_device
-from src.dataset import get_mnist_dataloaders
-from src.model import SampleCNN, validate_model_for_opacus
+from src.data_split import get_data_loaders
+from src.model import get_model, validate_model_for_opacus
 from src.evaluate import evaluate
 
 
 def run_dp_training():
-    """Run Differentially Private SGD training using Opacus PrivacyEngine on MNIST."""
+    """Run Differentially Private SGD training using Opacus PrivacyEngine."""
     print("=" * 60)
     print("STARTING DP-SGD TRAINING (Opacus PrivacyEngine)")
     print("=" * 60)
@@ -22,16 +27,12 @@ def run_dp_training():
     device = get_device()
     print(f"Device: {device}")
 
-    # 1. Dataset loading
-    train_loader, test_loader = get_mnist_dataloaders(
-        data_dir=config.DATA_DIR,
-        batch_size=config.BATCH_SIZE,
-        test_batch_size=config.TEST_BATCH_SIZE
-    )
+    # 1. Dataset loading (subsampled for MIA signal)
+    train_loader, test_loader, member_indices = get_data_loaders()
     print(f"Dataset loaded: {len(train_loader.dataset)} train samples, {len(test_loader.dataset)} test samples.")
 
     # 2. Model initialization & Opacus compatibility validation
-    model = SampleCNN().to(device)
+    model = get_model().to(device)
     is_valid, errors = validate_model_for_opacus(model)
     print(f"Opacus ModuleValidator check: is_valid={is_valid}, errors={errors}")
     if not is_valid:
@@ -93,7 +94,7 @@ def run_dp_training():
         print(
             f"Epoch [{epoch}/{config.EPOCHS}] - Train Loss: {epoch_loss:.4f} | "
             f"Test Loss: {test_loss:.4f} | Test Acc: {test_acc:.2f}% | "
-            f"ε (delta={config.DELTA}): {epsilon:.2f}"
+            f"eps (delta={config.DELTA}): {epsilon:.2f}"
         )
 
     elapsed = time.time() - start_time
@@ -102,8 +103,8 @@ def run_dp_training():
 
     print("\nDP Training Complete")
     print("--------------------")
-    print(f"Dataset: MNIST")
-    print(f"Model: SampleCNN")
+    print(f"Dataset: {config.DATASET}")
+    print(f"Model: {model._module.__class__.__name__ if hasattr(model, '_module') else model.__class__.__name__}")
     print(f"Optimizer: DP-SGD (Opacus)")
     print(f"Epochs: {config.EPOCHS}")
     print(f"Batch Size: {config.BATCH_SIZE}")

@@ -1,0 +1,386 @@
+{
+  "config": {
+    "n_members": 5000,
+    "n_nonmembers": 5000,
+    "seed": 42,
+    "member_index_file": "C:\\projects\\dp-sgd\\experiments\\splits\\member_indices_n5000_seed42.json",
+    "attack": "threshold",
+    "signals": [
+      "loss",
+      "confidence",
+      "mentr"
+    ]
+  },
+  "results": [
+    {
+      "checkpoint": "experiments\\checkpoints\\baseline_seed42.pt",
+      "label": "baseline (no DP)",
+      "epsilon": null,
+      "noise_multiplier": 0.0,
+      "seed": 42,
+      "test_accuracy": 97.56,
+      "member_accuracy": 1.0,
+      "nonmember_accuracy": 0.9764000177383423,
+      "generalization_gap": 0.023599982261657715,
+      "attacks": {
+        "loss": {
+          "auc": 0.4917385600000001,
+          "attack_accuracy": 0.5287999999999999,
+          "best_threshold": -0.01263953372836113,
+          "tpr_at_fpr_0.001": 0.000950305143853531,
+          "tpr_at_fpr_0.01": 0.009503051438535309,
+          "tpr_at_fpr_0.1": 0.0950305143853531
+        },
+        "confidence": {
+          "auc": 0.4917385600000001,
+          "attack_accuracy": 0.5287999999999999,
+          "best_threshold": 0.9874400496482849,
+          "tpr_at_fpr_0.001": 0.000950305143853531,
+          "tpr_at_fpr_0.01": 0.009503051438535309,
+          "tpr_at_fpr_0.1": 0.0950305143853531
+        },
+        "mentr": {
+          "auc": 0.5083136999999999,
+          "attack_accuracy": 0.5289999999999999,
+          "best_threshold": -0.00031757354736328125,
+          "tpr_at_fpr_0.001": 0.001011192325262677,
+          "tpr_at_fpr_0.01": 0.010111923252626769,
+          "tpr_at_fpr_0.1": 0.1011192325262677
+        }
+      }
+    },
+    {
+      "checkpoint": "experiments\\checkpoints\\dp_nm_0.30_seed42.pt",
+      "label": "eps=193.50",
+      "epsilon": 193.497362,
+      "noise_multiplier": 0.3,
+      "seed": 42,
+      "test_accuracy": 90.69,
+      "member_accuracy": 0.9053999781608582,
+      "nonmember_accuracy": 0.909600019454956,
+      "generalization_gap": -0.0042000412940979,
+      "attacks": {
+        "loss": {
+          "auc": 0.48895918,
+          "attack_accuracy": 0.5012000000000001,
+          "best_threshold": -7.307255744934082,
+          "tpr_at_fpr_0.001": 0.0009492385786802031,
+          "tpr_at_fpr_0.01": 0.00949238578680203,
+          "tpr_at_fpr_0.1": 0.09492385786802031
+        },
+        "confidence": {
+          "auc": 0.48895918,
+          "attack_accuracy": 0.5012000000000001,
+          "best_threshold": 0.0006706549902446568,
+          "tpr_at_fpr_0.001": 0.0009492385786802031,
+          "tpr_at_fpr_0.01": 0.00949238578680203,
+          "tpr_at_fpr_0.1": 0.09492385786802031
+        },
+        "mentr": {
+          "auc": 0.49015281999999993,
+          "attack_accuracy": 0.5013,
+          "best_threshold": -15.652005195617676,
+          "tpr_at_fpr_0.001": 0.0009627129540340727,
+          "tpr_at_fpr_0.01": 0.009627129540340727,
+          "tpr_at_fpr_0.1": 0.09627129540340727
+        }
+      }
+    },
+    {
+      "checkpoint": "experiments\\checkpoints\\dp_nm_0.50_seed42.pt",
+      "label": "eps=32.53",
+      "epsilon": 32.526847,
+      "noise_multiplier": 0.5,
+      "seed": 42,
+      "test_accuracy": 90.64,
+      "member_accuracy": 0.9071999788284302,
+      "nonmember_accuracy": 0.9085999727249146,
+      "generalization_gap": -0.001399993896484375,
+      "attacks": {
+        "loss": {
+          "auc": 0.48998836000000007,
+          "attack_accuracy": 0.5014000000000001,
+          "best_threshold": -7.851846694946289,
+          "tpr_at_fpr_0.001": 0.0009952153110047847,
+          "tpr_at_fpr_0.01": 0.009952153110047846,
+          "tpr_at_fpr_0.1": 0.09952153110047846
+        },
+        "confidence": {
+          "auc": 0.48998836000000007,
+          "attack_accuracy": 0.5014000000000001,
+          "best_threshold": 0.0003890328807756305,
+          "tpr_at_fpr_0.001": 0.0009952153110047847,
+          "tpr_at_fpr_0.01": 0.009952153110047846,
+          "tpr_at_fpr_0.1": 0.09952153110047846
+        },
+        "mentr": {
+          "auc": 0.4911722599999999,
+          "attack_accuracy": 0.5013000000000001,
+          "best_threshold": -15.390063285827637,
+          "tpr_at_fpr_0.001": 0.0009663029525032092,
+          "tpr_at_fpr_0.01": 0.009663029525032093,
+          "tpr_at_fpr_0.1": 0.09663029525032092
+        }
+      }
+    },
+    {
+      "checkpoint": "experiments\\checkpoints\\dp_nm_0.70_seed42.pt",
+      "label": "eps=11.29",
+      "epsilon": 11.285083,
+      "noise_multiplier": 0.7,
+      "seed": 42,
+      "test_accuracy": 90.57,
+      "member_accuracy": 0.9057999849319458,
+      "nonmember_accuracy": 0.9083999991416931,
+      "generalization_gap": -0.0026000142097473145,
+      "attacks": {
+        "loss": {
+          "auc": 0.4910685,
+          "attack_accuracy": 0.5022,
+          "best_threshold": -7.6141862869262695,
+          "tpr_at_fpr_0.001": 0.0010089020771513353,
+          "tpr_at_fpr_0.01": 0.010089020771513354,
+          "tpr_at_fpr_0.1": 0.10089020771513353
+        },
+        "confidence": {
+          "auc": 0.4910685,
+          "attack_accuracy": 0.5022,
+          "best_threshold": 0.0004934020107612014,
+          "tpr_at_fpr_0.001": 0.0010089020771513353,
+          "tpr_at_fpr_0.01": 0.010089020771513354,
+          "tpr_at_fpr_0.1": 0.10089020771513353
+        },
+        "mentr": {
+          "auc": 0.49299528000000004,
+          "attack_accuracy": 0.5015000000000001,
+          "best_threshold": -15.004647254943848,
+          "tpr_at_fpr_0.001": 0.0009761521108604576,
+          "tpr_at_fpr_0.01": 0.009761521108604577,
+          "tpr_at_fpr_0.1": 0.09761521108604576
+        }
+      }
+    },
+    {
+      "checkpoint": "experiments\\checkpoints\\dp_nm_0.90_seed42.pt",
+      "label": "eps=6.05",
+      "epsilon": 6.049802,
+      "noise_multiplier": 0.9,
+      "seed": 42,
+      "test_accuracy": 90.01,
+      "member_accuracy": 0.9034000039100647,
+      "nonmember_accuracy": 0.9020000100135803,
+      "generalization_gap": 0.001399993896484375,
+      "attacks": {
+        "loss": {
+          "auc": 0.49131868,
+          "attack_accuracy": 0.5021,
+          "best_threshold": -8.231595993041992,
+          "tpr_at_fpr_0.001": 0.0010081632653061226,
+          "tpr_at_fpr_0.01": 0.010081632653061225,
+          "tpr_at_fpr_0.1": 0.10081632653061226
+        },
+        "confidence": {
+          "auc": 0.49131868,
+          "attack_accuracy": 0.5021,
+          "best_threshold": 0.00026611125213094056,
+          "tpr_at_fpr_0.001": 0.0010081632653061226,
+          "tpr_at_fpr_0.01": 0.010081632653061225,
+          "tpr_at_fpr_0.1": 0.10081632653061226
+        },
+        "mentr": {
+          "auc": 0.4921079199999999,
+          "attack_accuracy": 0.5017,
+          "best_threshold": -0.8130232095718384,
+          "tpr_at_fpr_0.001": 0.000974176888315042,
+          "tpr_at_fpr_0.01": 0.009741768883150419,
+          "tpr_at_fpr_0.1": 0.0974176888315042
+        }
+      }
+    },
+    {
+      "checkpoint": "experiments\\checkpoints\\dp_nm_1.10_seed42.pt",
+      "label": "eps=4.09",
+      "epsilon": 4.091074,
+      "noise_multiplier": 1.1,
+      "seed": 42,
+      "test_accuracy": 89.56,
+      "member_accuracy": 0.8998000025749207,
+      "nonmember_accuracy": 0.8980000019073486,
+      "generalization_gap": 0.0018000006675720215,
+      "attacks": {
+        "loss": {
+          "auc": 0.49190923999999997,
+          "attack_accuracy": 0.5021,
+          "best_threshold": -0.9093613624572754,
+          "tpr_at_fpr_0.001": 0.0010089743589743593,
+          "tpr_at_fpr_0.01": 0.010089743589743592,
+          "tpr_at_fpr_0.1": 0.10089743589743592
+        },
+        "confidence": {
+          "auc": 0.49190923999999997,
+          "attack_accuracy": 0.5021,
+          "best_threshold": 0.4027813673019409,
+          "tpr_at_fpr_0.001": 0.0010089743589743593,
+          "tpr_at_fpr_0.01": 0.010089743589743592,
+          "tpr_at_fpr_0.1": 0.10089743589743592
+        },
+        "mentr": {
+          "auc": 0.4914401800000001,
+          "attack_accuracy": 0.5021,
+          "best_threshold": -1.3965401649475098,
+          "tpr_at_fpr_0.001": 0.0009717223650385605,
+          "tpr_at_fpr_0.01": 0.009717223650385605,
+          "tpr_at_fpr_0.1": 0.09717223650385605
+        }
+      }
+    },
+    {
+      "checkpoint": "experiments\\checkpoints\\dp_nm_1.50_seed42.pt",
+      "label": "eps=2.51",
+      "epsilon": 2.511363,
+      "noise_multiplier": 1.5,
+      "seed": 42,
+      "test_accuracy": 88.78,
+      "member_accuracy": 0.8894000053405762,
+      "nonmember_accuracy": 0.890999972820282,
+      "generalization_gap": -0.0015999674797058105,
+      "attacks": {
+        "loss": {
+          "auc": 0.49105476000000003,
+          "attack_accuracy": 0.5024,
+          "best_threshold": -6.285178184509277,
+          "tpr_at_fpr_0.001": 0.0009598352214212153,
+          "tpr_at_fpr_0.01": 0.009598352214212152,
+          "tpr_at_fpr_0.1": 0.09598352214212152
+        },
+        "confidence": {
+          "auc": 0.49105472,
+          "attack_accuracy": 0.5024,
+          "best_threshold": 0.00186372478492558,
+          "tpr_at_fpr_0.001": 0.0009598352214212153,
+          "tpr_at_fpr_0.01": 0.009598352214212152,
+          "tpr_at_fpr_0.1": 0.09598352214212152
+        },
+        "mentr": {
+          "auc": 0.49122622,
+          "attack_accuracy": 0.5028999999999999,
+          "best_threshold": -4.892524242401123,
+          "tpr_at_fpr_0.001": 0.0009711353431686979,
+          "tpr_at_fpr_0.01": 0.009711353431686979,
+          "tpr_at_fpr_0.1": 0.0971135343168698
+        }
+      }
+    },
+    {
+      "checkpoint": "experiments\\checkpoints\\dp_nm_2.00_seed42.pt",
+      "label": "eps=1.71",
+      "epsilon": 1.708727,
+      "noise_multiplier": 2.0,
+      "seed": 42,
+      "test_accuracy": 87.23,
+      "member_accuracy": 0.8722000122070312,
+      "nonmember_accuracy": 0.8781999945640564,
+      "generalization_gap": -0.0059999823570251465,
+      "attacks": {
+        "loss": {
+          "auc": 0.4891684399999999,
+          "attack_accuracy": 0.5041,
+          "best_threshold": -5.707022666931152,
+          "tpr_at_fpr_0.001": 0.0009821124361158431,
+          "tpr_at_fpr_0.01": 0.009821124361158432,
+          "tpr_at_fpr_0.1": 0.09821124361158433
+        },
+        "confidence": {
+          "auc": 0.48916857999999996,
+          "attack_accuracy": 0.5041,
+          "best_threshold": 0.003322550095617771,
+          "tpr_at_fpr_0.001": 0.0009821124361158431,
+          "tpr_at_fpr_0.01": 0.009821124361158432,
+          "tpr_at_fpr_0.1": 0.09821124361158433
+        },
+        "mentr": {
+          "auc": 0.48961370000000004,
+          "attack_accuracy": 0.5047999999999999,
+          "best_threshold": -10.450460433959961,
+          "tpr_at_fpr_0.001": 0.0009668455952005054,
+          "tpr_at_fpr_0.01": 0.009668455952005054,
+          "tpr_at_fpr_0.1": 0.09668455952005055
+        }
+      }
+    },
+    {
+      "checkpoint": "experiments\\checkpoints\\dp_nm_3.00_seed42.pt",
+      "label": "eps=1.05",
+      "epsilon": 1.046994,
+      "noise_multiplier": 3.0,
+      "seed": 42,
+      "test_accuracy": 82.51,
+      "member_accuracy": 0.8194000124931335,
+      "nonmember_accuracy": 0.8309999704360962,
+      "generalization_gap": -0.011599957942962646,
+      "attacks": {
+        "loss": {
+          "auc": 0.48082695999999997,
+          "attack_accuracy": 0.5015000000000001,
+          "best_threshold": -15.941108703613281,
+          "tpr_at_fpr_0.001": 0.0009356894553881808,
+          "tpr_at_fpr_0.01": 0.009356894553881808,
+          "tpr_at_fpr_0.1": 0.09356894553881809
+        },
+        "confidence": {
+          "auc": 0.4808296799999999,
+          "attack_accuracy": 0.5015000000000001,
+          "best_threshold": 1.1936154464819992e-07,
+          "tpr_at_fpr_0.001": 0.0009356894553881808,
+          "tpr_at_fpr_0.01": 0.009356894553881808,
+          "tpr_at_fpr_0.1": 0.09356894553881809
+        },
+        "mentr": {
+          "auc": 0.48135735999999996,
+          "attack_accuracy": 0.5011,
+          "best_threshold": -29.21298599243164,
+          "tpr_at_fpr_0.001": 0.0009386748844375962,
+          "tpr_at_fpr_0.01": 0.009386748844375962,
+          "tpr_at_fpr_0.1": 0.09386748844375963
+        }
+      }
+    },
+    {
+      "checkpoint": "experiments\\checkpoints\\dp_nm_5.00_seed42.pt",
+      "label": "eps=0.59",
+      "epsilon": 0.588783,
+      "noise_multiplier": 5.0,
+      "seed": 42,
+      "test_accuracy": 69.55,
+      "member_accuracy": 0.6777999997138977,
+      "nonmember_accuracy": 0.6988000273704529,
+      "generalization_gap": -0.021000027656555176,
+      "attacks": {
+        "loss": {
+          "auc": 0.48355254000000003,
+          "attack_accuracy": 0.5009,
+          "best_threshold": -31.48221206665039,
+          "tpr_at_fpr_0.001": 0.0009279918864097364,
+          "tpr_at_fpr_0.01": 0.009279918864097365,
+          "tpr_at_fpr_0.1": 0.09279918864097364
+        },
+        "confidence": {
+          "auc": 0.48342966,
+          "attack_accuracy": 0.5,
+          "best_threshold": null,
+          "tpr_at_fpr_0.001": 0.0009279918864097364,
+          "tpr_at_fpr_0.01": 0.009279918864097365,
+          "tpr_at_fpr_0.1": 0.09279918864097364
+        },
+        "mentr": {
+          "auc": 0.48507552,
+          "attack_accuracy": 0.5,
+          "best_threshold": null,
+          "tpr_at_fpr_0.001": 0.0009430579964850615,
+          "tpr_at_fpr_0.01": 0.009430579964850616,
+          "tpr_at_fpr_0.1": 0.09430579964850616
+        }
+      }
+    }
+  ]
+}
