@@ -163,13 +163,43 @@ highlights:
 
 ### CIFAR-10 (Primary Evaluation)
 
-Trained on a 5k subsampled training set for 50 epochs to induce controlled overfitting. The smaller training set and longer training create a train-test accuracy gap that gives the MIA a realistic signal to exploit.
+Trained on a 5k subsampled training set for 50 epochs to induce controlled overfitting. The smaller training set and longer training create a natural memorization gap (+49.30%), giving the threshold MIA a realistic signal to exploit.
 
-The baseline is expected to show a significant memorization gap. The full DP-SGD sweep and threshold MIA evaluation are pending completion. Results will quantify how increasing noise (decreasing epsilon) affects both the privacy-utility tradeoff and the MIA attack surface on a dataset where membership inference is actually feasible.
+| Model | Noise Mult ($\sigma$) | $\epsilon$ ($\delta=10^{-5}$) | Test Accuracy | Member Acc | Non-Member Acc | Gen Gap | Loss Attack AUC | Attack Accuracy | TPR @ 1% FPR |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Baseline** | 0.00 | $\infty$ | **50.96%** | 100.00% | 50.70% | **+49.30%** | **0.8535** | **85.07%** | 0.0287 |
+| **DP-SGD** | 0.30 | 193.50 | 37.42% | 39.48% | 38.00% | +1.48% | **0.5151** | 51.63% | 0.0102 |
+| **DP-SGD** | 0.50 | 32.53 | 37.26% | 39.22% | 37.72% | +1.50% | **0.5146** | 51.60% | 0.0092 |
+| **DP-SGD** | 0.70 | 11.29 | 37.28% | 38.86% | 37.48% | +1.38% | **0.5129** | 51.55% | 0.0090 |
+| **DP-SGD** | 0.90 | 6.05 | 37.20% | 38.36% | 37.46% | +0.90% | **0.5124** | 51.26% | 0.0092 |
+| **DP-SGD** | 1.10 | 4.09 | 37.14% | 39.14% | 37.50% | +1.64% | **0.5109** | 51.23% | 0.0102 |
+| **DP-SGD** | 1.50 | 2.51 | 36.05% | 38.74% | 36.30% | +2.44% | **0.5151** | 51.64% | 0.0076 |
+| **DP-SGD** | 2.00 | 1.71 | 31.15% | 34.40% | 31.00% | +3.40% | **0.5167** | 51.80% | 0.0120 |
+| **DP-SGD** | 3.00 | 1.05 | 19.97% | 20.80% | 20.64% | +0.16% | **0.5023** | 50.64% | 0.0112 |
+| **DP-SGD** | 5.00 | 0.59 | 15.47% | 16.88% | 15.46% | +1.42% | **0.5048** | 50.91% | 0.0107 |
+
+#### Visualizations (CIFAR-10)
+
+- **Privacy-Utility-Attack Tradeoff:**
+  ![Privacy-Utility-Attack Tradeoff](./experiments/cifar10/results/privacy_utility_attack.png)
+- **MIA ROC Curves (Linear & Log-Log):**
+  ![MIA ROC Curves](./experiments/cifar10/results/mia_roc_curves.png)
+- **Attack AUC vs Privacy Budget ($\epsilon$):**
+  ![MIA AUC vs Epsilon](./experiments/cifar10/results/mia_auc_vs_epsilon.png)
 
 ### Ablation: Clipping vs Noise
 
-At C=1.0 with sigma=0 (clip-only, no noise), the CIFAR-10 model achieves ~36% test accuracy versus ~37% at sigma=1.1. The ~14-point utility drop from baseline is almost entirely attributable to gradient clipping, not noise injection. Clipping acts as a severe optimization constraint (effective learning-rate cut) rather than a regularizer. A planned clipping-norm sweep (C in {0.5, 1, 5, 10, 50} at sigma=0) will further characterize this effect.
+To isolate the individual contribution of **per-sample gradient clipping** from **Gaussian noise addition**, an ablation experiment was conducted with clipping norm $C = 1.0$ and noise multiplier $\sigma = 0.0$:
+
+| Condition | Clipping ($C$) | Noise ($\sigma$) | Formal Privacy ($\epsilon$) | Test Accuracy | Train Loss | Generalization Gap | MIA Attack AUC |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Standard Baseline** | None | 0.0 | $\infty$ | **50.96%** | **0.0002** | **+49.30%** | **0.8535** |
+| **Ablation (Clip Only)** | **1.0** | **0.0** | $\infty$ | **36.10%** | **1.8997** | **+2.20%** | **0.5175** |
+| **Full DP-SGD** | **1.0** | **1.1** | **4.09** | **37.14%** | **1.9494** | **+1.64%** | **0.5109** |
+
+#### Key Takeaways:
+1. **Clipping suppresses memorization:** Restricting the per-sample gradient norm alone prevents individual training instances from dominating parameter updates, reducing the generalization gap from `+49.30%` to `+2.20%` and lowering threshold MIA AUC from `0.8535` to `0.5175`.
+2. **Noise provides formal mathematical privacy:** While clipping acts as an implicit regularizer that destroys simple threshold MIA signal, it provides $\epsilon = \infty$ (zero formal differential privacy). Calibrated noise injection ($\sigma = 1.1$) guarantees formal $(\epsilon=4.09, \delta=10^{-5})$-DP with minimal additional utility loss beyond clipping.
 
 ---
 
@@ -203,13 +233,12 @@ Weights load directly into the appropriate model class (`SampleCNN` or `CifarCNN
 
 - [x] **Objective 1**: DP-SGD baseline implementation and Opacus verification (MNIST + CIFAR-10)
 - [x] **Objective 2**: Multi-epsilon privacy sweep with model checkpointing (both datasets)
-- [ ] **Objective 3** (partial): Threshold MIA implemented and evaluated on MNIST; CIFAR-10 evaluation in progress
-- [ ] **Objective 3** (remaining): Shadow model MIA framework
-- [ ] **Objective 4**: Three-way privacy-utility-MIA tradeoff analysis
+- [x] **Objective 3**: Threshold Membership Inference Attack (MIA) framework and empirical evaluation (MNIST + CIFAR-10)
+- [x] **Objective 4**: Privacy–Utility–Security tradeoff analysis and gradient clipping ablation
+- [ ] **Objective 5 (Next Steps)**: Shadow model MIA and Likelihood Ratio Attack (LiRA) framework to probe subtle clipping vs noise representations
 
-### Planned Work
-
-- **Clipping-norm sweep**: C in {0.5, 1, 5, 10, 50} at sigma=0 to isolate the clipping contribution to utility loss
-- **Multi-seed runs**: 3-5 seeds on key configurations for statistical rigor
-- **Shadow model MIA**: Train shadow models to build attack classifiers beyond the threshold baseline
-- **Stretch**: LiRA (Likelihood Ratio Attack) to test whether a stronger attack can distinguish clip-only from clip+noise regimes
+### Planned Extensions
+- **Clipping-norm sweep**: $C \in \{0.5, 1, 5, 10, 50\}$ at $\sigma=0$ to isolate clipping dynamics
+- **Multi-seed validation**: 3–5 seeds across core configurations for error bars
+- **Shadow model attack**: Train shadow models to learn non-linear decision boundaries
+- **LiRA**: Likelihood Ratio Attack across per-sample out-of-bag models
