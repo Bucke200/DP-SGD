@@ -21,3 +21,7 @@ data/
 .idea/
 .vscode/
 *.swp
+
+# Project Notes & Context
+PROJECT_CONTEXT.md
+PROGRESS_UPDATE.md
