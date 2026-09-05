@@ -38,11 +38,13 @@ dp-sgd/
 │   ├── train_baseline.py               # Standard SGD baseline training
 │   ├── train_dp.py                     # DP-SGD training with Opacus PrivacyEngine
 │   ├── sweep_epsilon.py                # Multi-noise-multiplier sweep with checkpointing
+│   ├── sweep_clipping.py               # Multi-seed gradient clipping sweep (sigma=0.0) with binding diagnostics
 │   ├── verify_checkpoints.py           # Checkpoint loading verification
 │   ├── threshold_attack.py             # Loss-threshold MIA evaluation
 │   ├── run_ablation.py                 # Clipping vs noise ablation study
 │   ├── plot_curves.py                  # Privacy-utility curve plotting
-│   └── plot_mia_curves.py              # MIA AUC and ROC curve plotting
+│   ├── plot_mia_curves.py              # MIA AUC and ROC curve plotting
+│   └── plot_clipping.py                # Dual-axis utility vs MIA attack AUC plot for clipping sweep
 ├── experiments/
 │   ├── mnist/
 │   │   ├── checkpoints/
@@ -53,7 +55,7 @@ dp-sgd/
 │       ├── splits/
 │       └── results/
 └── tests/
-    └── test_pipeline.py                # 17 passing tests
+    └── test_pipeline.py                # 21 passing tests
 ```
 
 Output paths are dataset-scoped: all checkpoints, splits, and results go under `experiments/{dataset}/`. Checkpoint naming convention: `baseline_seed{N}.pt` for baselines, `dp_nm_{sigma}_seed{N}.pt` for DP-SGD models.
@@ -90,6 +92,10 @@ python -m src.verify_checkpoints                # Verify checkpoint integrity
 python -m src.threshold_attack                  # Run MIA evaluation
 python -m src.plot_curves                       # Privacy-utility curve
 python -m src.plot_mia_curves                   # MIA AUC plots
+
+# Gradient Clipping Ablation (Noise sigma = 0.0)
+python -m src.sweep_clipping                    # 15-run clipping sweep (C in {0.5, 1, 5, 10, 50}, seeds 42-44) + MIA
+python -m src.plot_clipping                     # Dual-axis utility vs attack AUC plot
 ```
 
 ---
@@ -189,17 +195,30 @@ Trained on a 5k subsampled training set for 50 epochs to induce controlled overf
 
 ### Ablation: Clipping vs Noise
 
-To isolate the individual contribution of **per-sample gradient clipping** from **Gaussian noise addition**, an ablation experiment was conducted with clipping norm $C = 1.0$ and noise multiplier $\sigma = 0.0$:
+To isolate the individual contribution of **per-sample gradient clipping** from **Gaussian noise addition**, an extensive ablation sweep was conducted across five clipping thresholds ($C \in \{0.5, 1.0, 5.0, 10.0, 50.0\}$) at noise multiplier $\sigma = 0.0$ across three random seeds ($42, 43, 44$), logging per-sample gradient norm diagnostics at epoch 1 and epoch 50:
 
-| Condition | Clipping ($C$) | Noise ($\sigma$) | Formal Privacy ($\epsilon$) | Test Accuracy | Train Loss | Generalization Gap | MIA Attack AUC |
+| Condition | Clip Norm ($C$) | Test Acc (mean ± std) | Gen Gap (mean ± std) | Loss Attack AUC (95% Bootstrap CI) | Distinguishable from 0.50? | Epoch 1 Clipped | Epoch 50 Clipped |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Standard Baseline** | None | 0.0 | $\infty$ | **50.96%** | **0.0002** | **+49.30%** | **0.8535** |
-| **Ablation (Clip Only)** | **1.0** | **0.0** | $\infty$ | **36.10%** | **1.8997** | **+2.20%** | **0.5175** |
-| **Full DP-SGD** | **1.0** | **1.1** | **4.09** | **37.14%** | **1.9494** | **+1.64%** | **0.5109** |
+| **Pure Clip** | **0.5** | $35.40\% \pm 0.73\%$ | $+0.0191 \pm 0.0100$ | **$0.5138$** $[0.5071, 0.5201]$ | Marginal | $100.0\%$ | $99.7\%$ |
+| **Pure Clip** | **1.0** | $38.85\% \pm 0.85\%$ | $+0.0337 \pm 0.0074$ | **$0.5230$** $[0.5161, 0.5291]$ | Yes ($>0.50$) | $100.0\%$ | $98.1\%$ |
+| **Pure Clip** | **5.0** | $45.34\% \pm 1.28\%$ | $+0.1891 \pm 0.0295$ | **$0.6198$** $[0.6131, 0.6258]$ | **Yes** | $3.1\%$ | $72.6\%$ |
+| **Pure Clip** | **10.0** | $46.72\% \pm 0.82\%$ | $+0.4611 \pm 0.0077$ | **$0.7780$** $[0.7730, 0.7833]$ | **Yes** | $0.3\%$ | $24.3\%$ |
+| **Pure Clip** | **50.0** | $49.94\% \pm 0.61\%$ | $+0.5014 \pm 0.0102$ | **$0.8421$** $[0.8369, 0.8468]$ | **Yes** | $0.0\%$ | $0.0\%$ |
+| *Baseline (no DP)* | *None* | *50.96%* | *+0.4930* | *0.8535* | *Yes* | *0.0%* | *0.0%* |
+| *Full DP-SGD* | *1.0 ($\sigma=1.1$)* | *37.14%* | *+0.0164* | *0.5109* | *Marginal* | *—* | *—* |
 
-#### Key Takeaways:
-1. **Clipping suppresses memorization:** Restricting the per-sample gradient norm alone prevents individual training instances from dominating parameter updates, reducing the generalization gap from `+49.30%` to `+2.20%` and lowering threshold MIA AUC from `0.8535` to `0.5175`.
-2. **Noise provides formal mathematical privacy:** While clipping acts as an implicit regularizer that destroys simple threshold MIA signal, it provides $\epsilon = \infty$ (zero formal differential privacy). Calibrated noise injection ($\sigma = 1.1$) guarantees formal $(\epsilon=4.09, \delta=10^{-5})$-DP with minimal additional utility loss beyond clipping.
+#### Visualizations (Clipping Sweep)
+
+- **Gradient Clipping Sweep (Utility vs. MIA Attack AUC):**
+  ![Clipping Sweep](./experiments/cifar10/results/clipping_sweep.png)
+
+#### Key Empirical Findings:
+1. **The accuracy penalty is an optimization constraint that relaxes with $C$:**
+   At $C = 1.0$, test accuracy is suppressed by ~12–14 percentage points compared to the baseline. As $C$ increases to $50.0$, test accuracy reaches $49.94\%$ (peaking at $50.52\%$ on seed 44), effectively recovering the unclipped baseline accuracy ($50.96\%$).
+2. **No sweet spot exists where clipping alone suppresses attacks without hurting accuracy:**
+   Utility and memorization are tightly coupled under gradient clipping. As soon as $C$ is relaxed to $5.0$ to regain accuracy ($45.34\%$), the generalization gap surges to $+18.91\%$ and the MIA Attack AUC climbs to $0.6198$ (statistically distinguishable from $0.50$). At $C=10.0$, clipping is largely unbinding, and Attack AUC escalates to $0.7780$, reaching $0.8421$ at $C=50.0$.
+3. **Clipping provides empirical regularization, not formal mathematical privacy:**
+   While small clip norms ($C \le 1.0$) destroy simple threshold MIA signal by preventing sample memorization, they provide $\epsilon = \infty$ (zero formal differential privacy). Calibrated Gaussian noise addition is essential for provable, worst-case differential privacy guarantees.
 
 ---
 
@@ -211,7 +230,8 @@ Every checkpoint stores a self-contained metadata dict for downstream MIA evalua
 {
     "model_state_dict": ...,
     "model_type": "baseline" | "dp-sgd",
-    "epsilon": float | "inf",
+    "epsilon": float | "inf" | None,
+    "epsilon_note": str | None,
     "delta": 1e-5 | None,
     "noise_multiplier": float,
     "max_grad_norm": float,
@@ -222,6 +242,7 @@ Every checkpoint stores a self-contained metadata dict for downstream MIA evalua
     "test_accuracy": float,
     "test_loss": float,
     "training_time_sec": float,
+    "clipping_diagnostics": dict | None,
 }
 ```
 
@@ -234,11 +255,11 @@ Weights load directly into the appropriate model class (`SampleCNN` or `CifarCNN
 - [x] **Objective 1**: DP-SGD baseline implementation and Opacus verification (MNIST + CIFAR-10)
 - [x] **Objective 2**: Multi-epsilon privacy sweep with model checkpointing (both datasets)
 - [x] **Objective 3**: Threshold Membership Inference Attack (MIA) framework and empirical evaluation (MNIST + CIFAR-10)
-- [x] **Objective 4**: Privacy–Utility–Security tradeoff analysis and gradient clipping ablation
+- [x] **Objective 4**: Privacy–Utility–Security tradeoff analysis and multi-seed gradient clipping ablation ($C \in \{0.5, 1, 5, 10, 50\}$, seeds 42–44)
 - [ ] **Objective 5 (Next Steps)**: Shadow model MIA and Likelihood Ratio Attack (LiRA) framework to probe subtle clipping vs noise representations
 
 ### Planned Extensions
-- **Clipping-norm sweep**: $C \in \{0.5, 1, 5, 10, 50\}$ at $\sigma=0$ to isolate clipping dynamics
-- **Multi-seed validation**: 3–5 seeds across core configurations for error bars
-- **Shadow model attack**: Train shadow models to learn non-linear decision boundaries
-- **LiRA**: Likelihood Ratio Attack across per-sample out-of-bag models
+- [x] **Clipping-norm sweep**: $C \in \{0.5, 1, 5, 10, 50\}$ at $\sigma=0$ to isolate clipping dynamics
+- [x] **Multi-seed validation**: 3 seeds across core clipping configurations for statistical confidence intervals
+- [ ] **Shadow model attack**: Train shadow models to learn non-linear decision boundaries
+- [ ] **LiRA**: Likelihood Ratio Attack across per-sample out-of-bag models

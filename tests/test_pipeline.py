@@ -345,3 +345,102 @@ def test_mia_aggregation():
     assert dp[0]["epsilon"] == 0.3
     assert dp[0]["auc_mean"] == pytest.approx(0.505)
     assert dp[0]["acc_mean"] == pytest.approx(90.5)
+
+
+def test_clipping_sweep_json_entries():
+    """Verify that clipping_sweep.json exists and has one entry per (C, seed) pair."""
+    manifest_path = os.path.join(config.RESULTS_DIR, "clipping_sweep.json")
+    assert os.path.exists(manifest_path), f"clipping_sweep.json not found at {manifest_path}"
+    with open(manifest_path, "r") as f:
+        results = json.load(f)
+    if isinstance(results, dict) and "results" in results:
+        results = results["results"]
+
+    expected_clips = [0.5, 1.0, 5.0, 10.0, 50.0]
+    expected_seeds = [42, 43, 44]
+    expected_pairs = {(float(c), int(s)) for c in expected_clips for s in expected_seeds}
+
+    found_pairs = set()
+    for entry in results:
+        c = float(entry["clip_norm"])
+        s = int(entry["seed"])
+        found_pairs.add((c, s))
+
+    assert found_pairs == expected_pairs, (
+        f"Missing/extra (C, seed) pairs. Missing: {expected_pairs - found_pairs}, "
+        f"Extra: {found_pairs - expected_pairs}"
+    )
+    assert len(results) == len(expected_pairs)
+
+
+def test_clipping_sweep_checkpoints_load():
+    """Verify that every checkpoint path exists and loads into a clean CifarCNN."""
+    manifest_path = os.path.join(config.RESULTS_DIR, "clipping_sweep.json")
+    assert os.path.exists(manifest_path), f"clipping_sweep.json not found at {manifest_path}"
+    with open(manifest_path, "r") as f:
+        results = json.load(f)
+    if isinstance(results, dict) and "results" in results:
+        results = results["results"]
+
+    device = torch.device("cpu")
+    for entry in results:
+        ckpt_path = entry.get("checkpoint_path") or entry.get("checkpoint")
+        assert ckpt_path is not None, f"No checkpoint key in entry: {entry}"
+        if not os.path.isabs(ckpt_path):
+            ckpt_path = os.path.abspath(ckpt_path)
+        assert os.path.exists(ckpt_path), f"Checkpoint does not exist: {ckpt_path}"
+
+        model = CifarCNN().to(device)
+        ckpt_data = torch.load(ckpt_path, map_location=device, weights_only=False)
+        state_dict = ckpt_data["model_state_dict"] if "model_state_dict" in ckpt_data else ckpt_data
+        state_dict = {k.replace("_module.", "", 1): v for k, v in state_dict.items()}
+        model.load_state_dict(state_dict)
+        model.eval()
+
+        dummy_x = torch.randn(2, 3, 32, 32)
+        out = model(dummy_x)
+        assert out.shape == (2, 10)
+
+
+def test_clipping_sweep_epsilon_is_null():
+    """Verify that epsilon is null for all clipping-sweep runs."""
+    manifest_path = os.path.join(config.RESULTS_DIR, "clipping_sweep.json")
+    assert os.path.exists(manifest_path), f"clipping_sweep.json not found at {manifest_path}"
+    with open(manifest_path, "r") as f:
+        results = json.load(f)
+    if isinstance(results, dict) and "results" in results:
+        results = results["results"]
+
+    for entry in results:
+        assert entry.get("epsilon") is None, (
+            f"Expected epsilon to be None, got {entry.get('epsilon')} for entry: {entry}"
+        )
+        assert "infinite" in str(entry.get("epsilon_note", "")).lower()
+
+
+def test_clipping_sweep_member_indices_match_epsilon_sweep():
+    """Verify that the member index set used by clipping sweep is identical to epsilon sweep at the same seed."""
+    import numpy as np
+    splits_dir = getattr(config, "SPLITS_DIR", "experiments/cifar10/splits")
+    n_train = getattr(config, "N_TRAIN", 5000)
+
+    for seed in [42, 43, 44]:
+        _, _, clipping_indices = get_data_loaders(seed=seed, save_indices=False)
+
+        json_path = os.path.join(splits_dir, f"member_indices_n{n_train}_seed{seed}.json")
+        npy_path = os.path.join(splits_dir, f"member_indices_n{n_train}_seed{seed}.npy")
+
+        if os.path.exists(json_path):
+            with open(json_path, "r") as f:
+                saved_indices = np.array(json.load(f))
+            assert np.array_equal(clipping_indices, saved_indices), (
+                f"Seed {seed} member indices do not match {json_path}"
+            )
+        elif os.path.exists(npy_path):
+            saved_indices = np.load(npy_path)
+            assert np.array_equal(clipping_indices, saved_indices), (
+                f"Seed {seed} member indices do not match {npy_path}"
+            )
+        else:
+            pytest.fail(f"No saved member index file found for seed {seed}")
+
