@@ -68,13 +68,46 @@ def roc_from_scores(member: np.ndarray, nonmember: np.ndarray):
 
 def load(args):
     data = json.loads(Path(args.results).read_text())
-    rows = data["results"]
+    if isinstance(data, dict) and "results" in data:
+        rows = data["results"]
+    elif isinstance(data, dict):
+        # Multi-seed dictionary keyed by noise multiplier
+        rows = []
+        for nm_key, val in data.items():
+            if isinstance(val, dict) and "runs" in val:
+                for r in val["runs"]:
+                    r_copy = dict(r)
+                    if "label" not in r_copy:
+                        eps = r_copy.get("epsilon")
+                        if eps == "inf" or eps is None or float(r_copy.get("noise_multiplier", 0)) == 0:
+                            r_copy["label"] = "baseline (no DP)"
+                            r_copy["epsilon"] = None
+                        else:
+                            r_copy["label"] = f"eps={float(eps):.2f}"
+                            r_copy["epsilon"] = float(eps)
+                    if "attacks" not in r_copy and "attack_auc" in r_copy:
+                        r_copy["attacks"] = {
+                            "loss": {
+                                "auc": r_copy["attack_auc"],
+                                "attack_accuracy": r_copy.get("attack_accuracy", 0.5),
+                                "tpr_at_fpr_0.01": r_copy.get("tpr_at_1pct_fpr", 0.0),
+                                "tpr_at_fpr_0.001": 0.0,
+                            }
+                        }
+                    r_copy["_ci_lower"] = val.get("attack_auc_ci_lower")
+                    r_copy["_ci_upper"] = val.get("attack_auc_ci_upper")
+                    rows.append(r_copy)
+            elif isinstance(val, dict):
+                rows.append(val)
+    else:
+        rows = data
+
     for row in rows:
-        stem = Path(row["checkpoint"]).stem
+        stem = Path(row.get("checkpoint_path") or row["checkpoint"]).stem
         npz_path = Path(args.scores_dir) / f"{stem}.npz"
         row["_scores"] = np.load(npz_path) if npz_path.exists() else None
     # baseline (epsilon=None) first, then increasing privacy budget
-    rows.sort(key=lambda r: (r["epsilon"] is not None, r["epsilon"] or 0.0))
+    rows.sort(key=lambda r: (r.get("epsilon") is not None, r.get("epsilon") or 0.0))
     return data, rows
 
 
@@ -125,21 +158,34 @@ def plot_roc(rows, signal, out_dir):
 
 
 def aggregate(rows, signal):
-    """Group by noise multiplier so multi-seed runs collapse to mean +- std."""
+    """Group by noise multiplier so multi-seed runs collapse to mean +- std with bootstrap CIs."""
     groups = defaultdict(list)
     for row in rows:
         groups[row.get("noise_multiplier")].append(row)
 
     dp, baseline = [], None
     for nm, members in groups.items():
-        eps = [r["epsilon"] for r in members if r["epsilon"] is not None]
-        auc = np.array([r["attacks"][signal]["auc"] for r in members])
+        eps = [r["epsilon"] for r in members if r.get("epsilon") is not None]
+        auc = np.array([r["attacks"][signal]["auc"] for r in members if signal in r.get("attacks", {})])
         acc = np.array([r["test_accuracy"] for r in members
-                        if r["test_accuracy"] is not None])
+                        if r.get("test_accuracy") is not None])
+
+        ci_lows = [r["_ci_lower"] for r in members if r.get("_ci_lower") is not None]
+        ci_highs = [r["_ci_upper"] for r in members if r.get("_ci_upper") is not None]
+
+        mean_auc = float(auc.mean()) if auc.size else 0.5
+        std_auc = float(auc.std()) if auc.size else 0.0
+
+        ci_lower = float(ci_lows[0]) if ci_lows else max(0.0, mean_auc - 1.96 * std_auc)
+        ci_upper = float(ci_highs[0]) if ci_highs else min(1.0, mean_auc + 1.96 * std_auc)
+
         record = {
             "noise_multiplier": nm,
             "epsilon": float(np.mean(eps)) if eps else None,
-            "auc_mean": float(auc.mean()), "auc_std": float(auc.std()),
+            "auc_mean": mean_auc,
+            "auc_std": std_auc,
+            "ci_lower": ci_lower,
+            "ci_upper": ci_upper,
             "acc_mean": float(acc.mean()) if acc.size else None,
             "acc_std": float(acc.std()) if acc.size else None,
             "n_seeds": len(members),
@@ -157,25 +203,24 @@ def plot_auc_vs_epsilon(baseline, dp, signal, out_dir):
     fig, ax = plt.subplots(figsize=(7.5, 5))
     eps = [r["epsilon"] for r in dp]
     auc = [r["auc_mean"] for r in dp]
-    err = [r["auc_std"] for r in dp]
+    ci_low = [r.get("ci_lower", r["auc_mean"] - r["auc_std"]) for r in dp]
+    ci_high = [r.get("ci_upper", r["auc_mean"] + r["auc_std"]) for r in dp]
 
-    if any(e > 0 for e in err):
-        ax.errorbar(eps, auc, yerr=err, marker="o", capsize=3, lw=2, color="#1f77b4",
-                    label="DP-SGD")
-    else:
-        ax.plot(eps, auc, marker="o", lw=2, color="#1f77b4", label="DP-SGD")
+    # Shaded band for bootstrap 95% CI
+    ax.fill_between(eps, ci_low, ci_high, color="#1f77b4", alpha=0.25, label="95% Bootstrap CI")
+    ax.plot(eps, auc, marker="o", lw=2, color="#1f77b4", label="DP-SGD (mean AUC)")
 
     if baseline:
         ax.axhline(baseline["auc_mean"], color="crimson", ls="--", lw=2,
-                   label=f"non-private baseline ({baseline['auc_mean']:.3f})")
-    ax.axhline(0.5, color="grey", ls=":", lw=1.5, label="random guess (0.50)")
+                   label=f"Non-private baseline ({baseline['auc_mean']:.3f})")
+    ax.axhline(0.5, color="grey", ls=":", lw=1.5, label="Random guess (0.50)")
 
     ax.set_xscale("log")
-    ax.set_xlabel(r"Privacy budget $\varepsilon$ (log scale)")
-    ax.set_ylabel(f"Attack AUC-ROC ({signal})")
-    ax.set_title("Membership inference risk vs privacy budget")
+    ax.set_xlabel(r"Privacy budget $\varepsilon$ (log scale)", fontsize=11)
+    ax.set_ylabel(f"Attack AUC-ROC ({signal})", fontsize=11)
+    ax.set_title("Membership inference risk vs privacy budget", fontsize=13)
     ax.grid(alpha=0.3)
-    ax.legend()
+    ax.legend(loc="upper right", fontsize=9.5)
     fig.tight_layout()
     path = out_dir / "mia_auc_vs_epsilon.png"
     fig.savefig(path, dpi=200)
@@ -186,31 +231,42 @@ def plot_auc_vs_epsilon(baseline, dp, signal, out_dir):
 def plot_tradeoff(baseline, dp, signal, out_dir):
     if not any(r["acc_mean"] is not None for r in dp):
         return None
-    fig, ax = plt.subplots(figsize=(7.5, 5))
+    fig, ax = plt.subplots(figsize=(8, 5.2))
     eps = [r["epsilon"] for r in dp]
 
-    ax.plot(eps, [r["acc_mean"] for r in dp], marker="o", color="#2ca02c", lw=2,
-            label="test accuracy")
+    l1 = ax.plot(eps, [r["acc_mean"] for r in dp], marker="o", color="#2ca02c", lw=2,
+                 label="Test accuracy (%)")
     ax.set_xscale("log")
-    ax.set_xlabel(r"Privacy budget $\varepsilon$ (log scale)")
-    ax.set_ylabel("Test accuracy (%)", color="#2ca02c")
+    ax.set_xlabel(r"Privacy budget $\varepsilon$ (log scale)", fontsize=11)
+    ax.set_ylabel("Test accuracy (%)", color="#2ca02c", fontsize=11)
     ax.tick_params(axis="y", labelcolor="#2ca02c")
     ax.grid(alpha=0.3)
 
     ax2 = ax.twinx()
-    ax2.plot(eps, [r["auc_mean"] for r in dp], marker="s", color="#d62728", lw=2,
-             label="attack AUC")
-    ax2.axhline(0.5, color="grey", ls=":", lw=1.5)
-    ax2.set_ylabel(f"Attack AUC-ROC ({signal})", color="#d62728")
+    l2 = ax2.plot(eps, [r["auc_mean"] for r in dp], marker="s", color="#d62728", lw=2,
+                  label=f"Attack AUC ({signal})")
+    l_rnd = ax2.axhline(0.5, color="grey", ls=":", lw=1.5, label="Random guess (0.50)")
+    ax2.set_ylabel(f"Attack AUC-ROC ({signal})", color="#d62728", fontsize=11)
     ax2.tick_params(axis="y", labelcolor="#d62728")
 
-    if baseline and baseline["acc_mean"] is not None:
-        ax.axhline(baseline["acc_mean"], color="#2ca02c", ls="--", lw=1, alpha=0.6)
-        ax2.axhline(baseline["auc_mean"], color="#d62728", ls="--", lw=1, alpha=0.6)
+    handles = l1 + l2 + [l_rnd]
+    if baseline:
+        if baseline.get("acc_mean") is not None:
+            l_base_acc = ax.axhline(
+                baseline["acc_mean"], color="#2ca02c", ls="--", lw=1.5, alpha=0.7,
+                label=f"Baseline accuracy ({baseline['acc_mean']:.1f}%)"
+            )
+            handles.append(l_base_acc)
+        if baseline.get("auc_mean") is not None:
+            l_base_auc = ax2.axhline(
+                baseline["auc_mean"], color="#d62728", ls="--", lw=1.5, alpha=0.7,
+                label=f"Baseline AUC ({baseline['auc_mean']:.3f})"
+            )
+            handles.append(l_base_auc)
 
-    handles = ax.get_lines()[:1] + ax2.get_lines()[:1]
-    ax.legend(handles, [h.get_label() for h in handles], loc="center right")
-    ax.set_title("Privacy / utility / attack-risk tradeoff")
+    labels = [h.get_label() for h in handles]
+    ax.legend(handles, labels, loc="center right", fontsize=8.5)
+    ax.set_title("Privacy / utility / attack-risk tradeoff", fontsize=13)
     fig.tight_layout()
     path = out_dir / "privacy_utility_attack.png"
     fig.savefig(path, dpi=200)
@@ -240,11 +296,15 @@ def main():
     except ImportError:
         default_out_dir = REPO_ROOT / "experiments/results"
 
-    default_results = default_out_dir / "threshold_attack.json"
-    if not default_results.exists():
-        legacy = REPO_ROOT / "experiments/results/threshold_attack.json"
-        if legacy.exists():
-            default_results = legacy
+    multiseed_results = default_out_dir / "epsilon_sweep_multiseed.json"
+    if multiseed_results.exists():
+        default_results = multiseed_results
+    else:
+        default_results = default_out_dir / "threshold_attack.json"
+        if not default_results.exists():
+            legacy = REPO_ROOT / "experiments/results/threshold_attack.json"
+            if legacy.exists():
+                default_results = legacy
 
     default_scores = default_out_dir / "mia_scores"
     if not default_scores.exists():

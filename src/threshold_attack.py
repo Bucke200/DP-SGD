@@ -329,19 +329,34 @@ def main():
     if not manifest_path.exists():
         raise SystemExit(f"Manifest not found: {manifest_path}. Run src.sweep_epsilon first.")
 
+    import re
+    from types import SimpleNamespace
+
     manifest = json.loads(manifest_path.read_text())
-    entries = manifest["results"] if isinstance(manifest, dict) else manifest
+    if isinstance(manifest, dict):
+        if "results" in manifest:
+            entries = manifest["results"]
+        else:
+            entries = []
+            for nm_key, val in manifest.items():
+                if isinstance(val, dict) and "runs" in val:
+                    entries.extend(val["runs"])
+                elif isinstance(val, dict):
+                    entries.append(val)
+    else:
+        entries = manifest
 
     device = torch.device(args.device)
-    member_loader, nonmember_loader, n = build_loaders(args, cfg)
-    print(f"[info] attack set: {n} members / {n} non-members on {device}\n")
-
     scores_dir = Path(args.scores_dir)
     scores_dir.mkdir(parents=True, exist_ok=True)
 
+    # Cache loaders per seed
+    loaders_by_seed = {}
+    n_train = cfg.get("N_TRAIN", 5000)
+
     results = []
     for entry in entries:
-        ckpt = Path(entry["checkpoint"])
+        ckpt = Path(entry.get("checkpoint_path") or entry["checkpoint"])
         if not ckpt.is_absolute():
             ckpt = REPO_ROOT / ckpt
         if not ckpt.exists():
@@ -351,6 +366,51 @@ def main():
         if not ckpt.exists():
             print(f"[skip] missing checkpoint {ckpt}")
             continue
+
+        seed = entry.get("seed")
+        if seed is None:
+            m = re.search(r"seed(\d+)", ckpt.name)
+            seed = int(m.group(1)) if m else int(args.seed)
+        else:
+            seed = int(seed)
+
+        # Determine member index file for this checkpoint's seed
+        seed_json = splits_dir / f"member_indices_n{n_train}_seed{seed}.json"
+        seed_npy = splits_dir / f"member_indices_n{n_train}_seed{seed}.npy"
+
+        if seed_json.exists():
+            member_file = str(seed_json)
+        elif seed_npy.exists():
+            member_file = str(seed_npy)
+        elif seed == cfg["SEED"] and (splits_dir / "member_indices.npy").exists():
+            member_file = str(splits_dir / "member_indices.npy")
+        else:
+            raise FileNotFoundError(
+                f"FATAL: No member index file found for seed {seed} under {splits_dir}!"
+            )
+
+        # STRICT ASSERTION: verify loaded member index file corresponds to checkpoint's seed
+        assert f"seed{seed}" in Path(member_file).name, (
+            f"FATAL: Member index file '{member_file}' does not match checkpoint seed '{seed}'! "
+            f"Evaluating model against wrong seed indices produces false AUC ~0.50."
+        )
+
+        if seed not in loaders_by_seed:
+            args_seed = SimpleNamespace(
+                data_root=args.data_root,
+                member_index_file=member_file,
+                n_samples=args.n_samples,
+                batch_size=args.batch_size,
+                num_workers=args.num_workers,
+                seed=seed,
+            )
+            m_ldr, nm_ldr, n_actual = build_loaders(args_seed, cfg)
+            loaders_by_seed[seed] = (m_ldr, nm_ldr, n_actual, member_file)
+
+        member_loader, nonmember_loader, n, loaded_split = loaders_by_seed[seed]
+        assert f"seed{seed}" in Path(loaded_split).name, (
+            f"FATAL: Loaded split '{loaded_split}' does not match checkpoint seed '{seed}'!"
+        )
 
         eps = parse_epsilon(entry.get("epsilon"))
         label = "baseline (no DP)" if not np.isfinite(eps) else f"eps={eps:.2f}"

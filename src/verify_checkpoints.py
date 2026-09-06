@@ -62,31 +62,58 @@ def verify_single_checkpoint(ckpt_path, test_loader, device):
 
 
 def main():
-    manifest_path = os.path.join(config.RESULTS_DIR, "epsilon_sweep.json")
+    import argparse
+    parser = argparse.ArgumentParser(description="Verify saved model checkpoints")
+    parser.add_argument(
+        "--manifest", type=str, default=None,
+        help="Path to manifest json (defaults to epsilon_sweep_multiseed.json if present, else epsilon_sweep.json)"
+    )
+    args = parser.parse_args()
 
-    # Fallback to legacy path if dataset-scoped file does not exist yet
-    if not os.path.exists(manifest_path):
-        legacy_manifest = "experiments/results/epsilon_sweep.json"
-        if os.path.exists(legacy_manifest):
-            manifest_path = legacy_manifest
+    if args.manifest:
+        manifest_path = args.manifest
+    else:
+        multiseed_path = os.path.join(config.RESULTS_DIR, "epsilon_sweep_multiseed.json")
+        single_path = os.path.join(config.RESULTS_DIR, "epsilon_sweep.json")
+        if os.path.exists(multiseed_path):
+            manifest_path = multiseed_path
+        elif os.path.exists(single_path):
+            manifest_path = single_path
+        elif os.path.exists("experiments/results/epsilon_sweep.json"):
+            manifest_path = "experiments/results/epsilon_sweep.json"
         else:
-            print(f"Manifest not found: {manifest_path}")
-            print("Run the sweep first: python -m src.sweep_epsilon")
-            sys.exit(1)
+            manifest_path = multiseed_path
 
-    with open(manifest_path) as f:
-        results = json.load(f)
+    if not os.path.exists(manifest_path):
+        print(f"Manifest not found: {manifest_path}")
+        print("Run the sweep first: python -m src.sweep_epsilon")
+        sys.exit(1)
+
+    with open(manifest_path, "r") as f:
+        data = json.load(f)
+
+    if isinstance(data, dict) and "results" in data:
+        results = data["results"]
+    elif isinstance(data, dict):
+        results = []
+        for nm_key, val in data.items():
+            if isinstance(val, dict) and "runs" in val:
+                results.extend(val["runs"])
+            elif isinstance(val, dict):
+                results.append(val)
+    else:
+        results = data
 
     device = get_device()
-    _, test_loader, _ = get_data_loaders(batch_size=64)
+    _, test_loader, _ = get_data_loaders(batch_size=64, save_indices=False)
 
-    print(f"Verifying {len(results)} checkpoints [{config.DATASET.upper()}]...\n")
+    print(f"Verifying {len(results)} checkpoints [{config.DATASET.upper()}] from {manifest_path}...\n")
 
     passed = 0
     failed = 0
 
     for entry in results:
-        ckpt_path = entry["checkpoint"]
+        ckpt_path = entry.get("checkpoint_path") or entry.get("checkpoint")
 
         if not os.path.exists(ckpt_path):
             candidate = os.path.join(config.CHECKPOINT_DIR, os.path.basename(ckpt_path))
@@ -110,8 +137,8 @@ def main():
 
             eps_str = (
                 "baseline"
-                if result["epsilon"] == "inf"
-                else f"ε={result['epsilon']:.4f}"
+                if result["epsilon"] == "inf" or result["epsilon"] is None
+                else f"ε={float(result['epsilon']):.4f}"
             )
 
             print(f"  {status:>8}  {eps_str:<16}  "
@@ -125,11 +152,10 @@ def main():
             failed += 1
 
     print(f"\n{'=' * 50}")
-    print(f"Results: {passed} passed, {failed} failed, "
-          f"{len(results)} total")
+    print(f"Results: {passed} passed, {failed} failed, {len(results)} total")
 
     if failed == 0:
-        print("All checkpoints verified — ready for Objective 3 (MIA)")
+        print("All checkpoints verified successfully!")
     else:
         print("Some checkpoints failed — fix before proceeding")
 

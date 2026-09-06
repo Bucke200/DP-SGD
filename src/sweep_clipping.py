@@ -460,6 +460,45 @@ def run_clipping_mia(
 
 # ── Aggregation & Bootstrap Analysis ─────────────────────────────────────────
 
+def compute_bootstrap_auc_ci(
+    seed_scores: list[dict[str, np.ndarray]],
+    n_bootstraps: int = 1000,
+    rng: np.random.Generator | None = None,
+    alpha: float = 0.05,
+    fallback_auc: float | None = None,
+) -> tuple[float, float]:
+    """
+    Compute a bootstrap confidence interval for MIA attack AUC over resampled score arrays.
+    Resamples member and non-member score arrays across seeds for each bootstrap iteration.
+    """
+    if rng is None:
+        rng = np.random.default_rng(42)
+    if not seed_scores:
+        val = fallback_auc if fallback_auc is not None else 0.5
+        return float(val), float(val)
+
+    boot_aucs = []
+    for _ in range(n_bootstraps):
+        seed_boot_aucs = []
+        for s in seed_scores:
+            m = s.get("mem_loss") if "mem_loss" in s else s.get("member_loss")
+            n = s.get("non_loss") if "non_loss" in s else s.get("nonmember_loss")
+            m_samp = rng.choice(m, size=len(m), replace=True)
+            n_samp = rng.choice(n, size=len(n), replace=True)
+            fpr, tpr, _ = roc_curve_np(
+                np.r_[np.ones(len(m_samp)), np.zeros(len(n_samp))],
+                np.r_[m_samp, n_samp],
+            )
+            seed_boot_aucs.append(auc_np(fpr, tpr))
+        boot_aucs.append(float(np.mean(seed_boot_aucs)))
+
+    lower_pct = (alpha / 2.0) * 100.0
+    upper_pct = (1.0 - alpha / 2.0) * 100.0
+    ci_lower = float(np.percentile(boot_aucs, lower_pct))
+    ci_upper = float(np.percentile(boot_aucs, upper_pct))
+    return ci_lower, ci_upper
+
+
 def aggregate_clipping_results(
     attack_results: list[dict],
     scores_dir: Path | str,
@@ -509,26 +548,13 @@ def aggregate_clipping_results(
 
         # Bootstrap 95% CI resampling score arrays across iterations
         if seed_scores:
-            boot_aucs = []
-            for _ in range(n_bootstraps):
-                seed_boot_aucs = []
-                for s in seed_scores:
-                    m = s["mem_loss"]
-                    n = s["non_loss"]
-                    m_samp = rng.choice(m, size=len(m), replace=True)
-                    n_samp = rng.choice(n, size=len(n), replace=True)
-                    fpr, tpr, _ = roc_curve_np(
-                        np.r_[np.ones(len(m_samp)), np.zeros(len(n_samp))],
-                        np.r_[m_samp, n_samp],
-                    )
-                    seed_boot_aucs.append(auc_np(fpr, tpr))
-                boot_aucs.append(float(np.mean(seed_boot_aucs)))
-
-            ci_lower = float(np.percentile(boot_aucs, 2.5))
-            ci_upper = float(np.percentile(boot_aucs, 97.5))
+            ci_lower, ci_upper = compute_bootstrap_auc_ci(
+                seed_scores, n_bootstraps=n_bootstraps, rng=rng
+            )
         else:
-            ci_lower = float(np.mean(aucs))
-            ci_upper = float(np.mean(aucs))
+            mean_auc = float(np.mean(aucs)) if aucs else 0.5
+            ci_lower = mean_auc
+            ci_upper = mean_auc
 
         record = {
             "clip_norm": c,

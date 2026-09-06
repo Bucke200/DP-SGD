@@ -25,14 +25,52 @@ import numpy as np
 
 
 def load_results(path):
-    """Load sweep manifest, separating baseline from DP runs."""
+    """
+    Load sweep manifest, supporting both multi-seed aggregated format
+    (keyed by noise multiplier) and single-seed flat list format.
+    Returns (baselines, dp_aggregated).
+    """
     with open(path) as f:
-        results = json.load(f)
+        data = json.load(f)
 
-    baselines = [r for r in results if r["epsilon"] == "inf"]
-    dp_runs = [r for r in results if r["epsilon"] != "inf"]
+    if isinstance(data, dict) and "results" in data:
+        data = data["results"]
 
-    return baselines, dp_runs
+    if isinstance(data, dict):
+        # Multi-seed dictionary keyed by noise multiplier
+        baselines = []
+        dp_aggregated = []
+        for nm_key, entry in sorted(data.items(), key=lambda x: float(x[0])):
+            nm = float(entry.get("noise_multiplier", nm_key))
+            eps = entry.get("epsilon")
+            if nm == 0.0 or eps == "inf" or eps is None:
+                if "runs" in entry and entry["runs"]:
+                    baselines.extend(entry["runs"])
+                else:
+                    baselines.append({
+                        "test_accuracy": entry.get("test_accuracy_mean", 0.0),
+                        "test_loss": entry.get("test_loss_mean", 0.0),
+                        "epsilon": "inf",
+                        "noise_multiplier": 0.0,
+                    })
+            else:
+                eps_val = float(eps)
+                dp_aggregated.append({
+                    "noise_multiplier": nm,
+                    "epsilon_mean": eps_val,
+                    "epsilon_std": 0.0,
+                    "accuracy_mean": float(entry["test_accuracy_mean"]),
+                    "accuracy_std": float(entry["test_accuracy_std"]),
+                    "loss_mean": float(entry["test_loss_mean"]),
+                    "loss_std": float(entry["test_loss_std"]),
+                    "n_seeds": int(entry.get("n_seeds", len(entry.get("runs", [])) or 1)),
+                })
+        return baselines, dp_aggregated
+
+    # Flat list (legacy single-seed or flat format)
+    baselines = [r for r in data if r.get("epsilon") == "inf" or r.get("noise_multiplier") == 0.0]
+    dp_runs = [r for r in data if r.get("epsilon") != "inf" and r.get("noise_multiplier") != 0.0]
+    return baselines, aggregate_by_noise_multiplier(dp_runs)
 
 
 def aggregate_by_noise_multiplier(runs):
@@ -47,18 +85,18 @@ def aggregate_by_noise_multiplier(runs):
     aggregated = []
     for nm in sorted(groups.keys()):
         group = groups[nm]
-        epsilons = [r["epsilon"] for r in group]
+        epsilons = [float(r["epsilon"]) for r in group if r.get("epsilon") is not None]
         accs = [r["test_accuracy"] for r in group]
         losses = [r["test_loss"] for r in group]
 
         aggregated.append({
             "noise_multiplier": nm,
-            "epsilon_mean": np.mean(epsilons),
-            "epsilon_std": np.std(epsilons),
-            "accuracy_mean": np.mean(accs),
-            "accuracy_std": np.std(accs),
-            "loss_mean": np.mean(losses),
-            "loss_std": np.std(losses),
+            "epsilon_mean": float(np.mean(epsilons)) if epsilons else 0.0,
+            "epsilon_std": float(np.std(epsilons)) if epsilons else 0.0,
+            "accuracy_mean": float(np.mean(accs)),
+            "accuracy_std": float(np.std(accs)),
+            "loss_mean": float(np.mean(losses)),
+            "loss_std": float(np.std(losses)),
             "n_seeds": len(group),
         })
 
@@ -68,7 +106,7 @@ def aggregate_by_noise_multiplier(runs):
 def plot_privacy_utility(baselines, dp_aggregated, output_path, dataset_name=None, show=False):
     """Generate the privacy–utility tradeoff plot."""
     if dataset_name is None:
-        if baselines and "dataset" in baselines[0] and baselines[0]["dataset"]:
+        if baselines and "dataset" in baselines[0] and baselines[0].get("dataset"):
             dataset_name = baselines[0]["dataset"]
         else:
             try:
@@ -87,26 +125,19 @@ def plot_privacy_utility(baselines, dp_aggregated, output_path, dataset_name=Non
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    # ── DP curve ──
+    # ── DP curve with std error bars on every point ──
     epsilons = [d["epsilon_mean"] for d in dp_aggregated]
     accs = [d["accuracy_mean"] for d in dp_aggregated]
     acc_stds = [d["accuracy_std"] for d in dp_aggregated]
 
-    multi_seed = dp_aggregated[0]["n_seeds"] > 1
+    multi_seed = any(d["n_seeds"] > 1 for d in dp_aggregated) or any(s > 0 for s in acc_stds)
 
-    if multi_seed:
-        ax.errorbar(
-            epsilons, accs, yerr=acc_stds,
-            fmt="bo-", linewidth=2, markersize=8,
-            capsize=4, capthick=1.5,
-            label="DP-SGD (mean ± std)",
-        )
-    else:
-        ax.plot(
-            epsilons, accs, "bo-",
-            linewidth=2, markersize=8,
-            label="DP-SGD",
-        )
+    ax.errorbar(
+        epsilons, accs, yerr=acc_stds,
+        fmt="bo-", linewidth=2, markersize=8,
+        capsize=4, capthick=1.5,
+        label="DP-SGD (mean ± std)" if multi_seed else "DP-SGD",
+    )
 
     # ── Baseline reference ──
     baseline_accs = [b["test_accuracy"] for b in baselines]
@@ -125,19 +156,30 @@ def plot_privacy_utility(baselines, dp_aggregated, output_path, dataset_name=Non
             color="r", alpha=0.08,
         )
 
-    # ── Annotations ──
+    # ── Annotations (repositioned nm=1.5, 1.1, 0.9 to avoid curve overlap) ──
     for d in dp_aggregated:
-        label = f"nm={d['noise_multiplier']}\nε={d['epsilon_mean']:.2f}"
-        if multi_seed:
+        nm = d["noise_multiplier"]
+        label = f"nm={nm}\nε={d['epsilon_mean']:.2f}"
+        if multi_seed and d["accuracy_std"] > 0:
             label += f"\n{d['accuracy_mean']:.1f}±{d['accuracy_std']:.1f}%"
         else:
             label += f"\n{d['accuracy_mean']:.1f}%"
+
+        # Explicitly reposition nm=1.5, 1.1, 0.9 to avoid overlapping each other and the curve
+        if abs(nm - 1.5) < 1e-3:
+            offset = (-30, 22)
+        elif abs(nm - 1.1) < 1e-3:
+            offset = (0, -42)
+        elif abs(nm - 0.9) < 1e-3:
+            offset = (30, 22)
+        else:
+            offset = (0, 15)
 
         ax.annotate(
             label,
             (d["epsilon_mean"], d["accuracy_mean"]),
             textcoords="offset points",
-            xytext=(0, 15), ha="center", fontsize=7,
+            xytext=offset, ha="center", fontsize=7,
             bbox=dict(boxstyle="round,pad=0.2", fc="white",
                       ec="gray", alpha=0.7),
         )
@@ -149,11 +191,6 @@ def plot_privacy_utility(baselines, dp_aggregated, output_path, dataset_name=Non
     ax.set_xscale("log")
     ax.legend(fontsize=11, loc="lower right")
     ax.grid(True, alpha=0.3)
-
-    # ── Guide regions ──
-    ax.axvspan(ax.get_xlim()[0], 1.0, color="green", alpha=0.03)
-    ax.axvspan(1.0, 10.0, color="yellow", alpha=0.03)
-    ax.axvspan(10.0, ax.get_xlim()[1], color="red", alpha=0.03)
 
     plt.tight_layout()
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
@@ -214,9 +251,15 @@ def main():
     except ImportError:
         default_results_dir = "experiments/results"
 
-    default_input = f"{default_results_dir}/epsilon_sweep.json"
-    if not os.path.exists(default_input) and os.path.exists("experiments/results/epsilon_sweep.json"):
+    multiseed_path = f"{default_results_dir}/epsilon_sweep_multiseed.json"
+    if os.path.exists(multiseed_path):
+        default_input = multiseed_path
+    elif os.path.exists(f"{default_results_dir}/epsilon_sweep.json"):
+        default_input = f"{default_results_dir}/epsilon_sweep.json"
+    elif os.path.exists("experiments/results/epsilon_sweep.json"):
         default_input = "experiments/results/epsilon_sweep.json"
+    else:
+        default_input = multiseed_path
 
     default_output = f"{default_results_dir}/privacy_utility_curve.png"
 
@@ -226,7 +269,7 @@ def main():
     parser.add_argument(
         "--input", type=str,
         default=default_input,
-        help="Path to epsilon_sweep.json manifest",
+        help="Path to epsilon_sweep_multiseed.json or epsilon_sweep.json manifest",
     )
     parser.add_argument(
         "--output", type=str,
@@ -239,13 +282,11 @@ def main():
     )
     args = parser.parse_args()
 
-    baselines, dp_runs = load_results(args.input)
+    baselines, dp_aggregated = load_results(args.input)
 
-    if not dp_runs:
+    if not dp_aggregated:
         print("No DP-SGD results found in manifest. Run sweep first.")
         return
-
-    dp_aggregated = aggregate_by_noise_multiplier(dp_runs)
 
     print_results_table(baselines, dp_aggregated)
     plot_privacy_utility(baselines, dp_aggregated, args.output, show=args.show)

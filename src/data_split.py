@@ -66,8 +66,26 @@ def get_split_loaders(
     full_train = datasets.MNIST(data_dir, train=True, download=True, transform=tfm)
     test_ds = datasets.MNIST(data_dir, train=False, download=True, transform=tfm)
 
-    rng = np.random.default_rng(seed)
-    member_indices = np.sort(rng.choice(len(full_train), size=n_train, replace=False))
+    splits_dir = getattr(config, "SPLITS_DIR", SPLIT_DIR)
+    seed_json_path = os.path.join(splits_dir, f"member_indices_n{n_train}_seed{seed}.json")
+    seed_npy_path = os.path.join(splits_dir, f"member_indices_n{n_train}_seed{seed}.npy")
+
+    if os.path.exists(seed_json_path):
+        with open(seed_json_path, "r") as f:
+            member_indices = np.array(json.load(f), dtype=np.int64)
+    elif os.path.exists(seed_npy_path):
+        member_indices = np.load(seed_npy_path).astype(np.int64)
+    else:
+        rng = np.random.default_rng(seed)
+        member_indices = np.sort(rng.choice(len(full_train), size=n_train, replace=False))
+        if save_indices:
+            os.makedirs(splits_dir, exist_ok=True)
+            np.save(seed_npy_path, member_indices)
+            with open(seed_json_path, "w") as f:
+                json.dump(member_indices.tolist(), f)
+            if seed == getattr(config, "SEED", 42):
+                npy_path = os.path.join(splits_dir, "member_indices.npy")
+                np.save(npy_path, member_indices)
 
     train_loader = DataLoader(
         Subset(full_train, member_indices.tolist()),
@@ -80,15 +98,6 @@ def get_split_loaders(
         batch_size=test_batch_size,
         shuffle=False,
     )
-
-    if save_indices:
-        splits_dir = getattr(config, "SPLITS_DIR", SPLIT_DIR)
-        os.makedirs(splits_dir, exist_ok=True)
-        path = os.path.join(splits_dir, f"member_indices_n{n_train}_seed{seed}.json")
-        with open(path, "w") as f:
-            json.dump(member_indices.tolist(), f)
-        npy_path = os.path.join(splits_dir, "member_indices.npy")
-        np.save(npy_path, member_indices)
 
     return train_loader, test_loader, member_indices
 
@@ -115,8 +124,26 @@ def get_cifar10_split_loaders(
     full_train = datasets.CIFAR10(data_dir, train=True, download=True, transform=tfm)
     test_ds = datasets.CIFAR10(data_dir, train=False, download=True, transform=tfm)
 
-    rng = np.random.default_rng(seed)
-    member_indices = np.sort(rng.choice(len(full_train), size=n_train, replace=False))
+    splits_dir = getattr(config, "SPLITS_DIR", SPLIT_DIR)
+    seed_json_path = os.path.join(splits_dir, f"member_indices_n{n_train}_seed{seed}.json")
+    seed_npy_path = os.path.join(splits_dir, f"member_indices_n{n_train}_seed{seed}.npy")
+
+    if os.path.exists(seed_json_path):
+        with open(seed_json_path, "r") as f:
+            member_indices = np.array(json.load(f), dtype=np.int64)
+    elif os.path.exists(seed_npy_path):
+        member_indices = np.load(seed_npy_path).astype(np.int64)
+    else:
+        rng = np.random.default_rng(seed)
+        member_indices = np.sort(rng.choice(len(full_train), size=n_train, replace=False))
+        if save_indices:
+            os.makedirs(splits_dir, exist_ok=True)
+            np.save(seed_npy_path, member_indices)
+            with open(seed_json_path, "w") as f:
+                json.dump(member_indices.tolist(), f)
+            if seed == getattr(config, "SEED", 42):
+                npy_path = os.path.join(splits_dir, "member_indices.npy")
+                np.save(npy_path, member_indices)
 
     train_loader = DataLoader(
         Subset(full_train, member_indices.tolist()),
@@ -129,17 +156,6 @@ def get_cifar10_split_loaders(
         batch_size=test_batch_size,
         shuffle=False,
     )
-
-    if save_indices:
-        splits_dir = getattr(config, "SPLITS_DIR", SPLIT_DIR)
-        os.makedirs(splits_dir, exist_ok=True)
-        npy_path = os.path.join(splits_dir, "member_indices.npy")
-        np.save(npy_path, member_indices)
-        seed_npy_path = os.path.join(splits_dir, f"member_indices_n{n_train}_seed{seed}.npy")
-        np.save(seed_npy_path, member_indices)
-        seed_json_path = os.path.join(splits_dir, f"member_indices_n{n_train}_seed{seed}.json")
-        with open(seed_json_path, "w") as f:
-            json.dump(member_indices.tolist(), f)
 
     return train_loader, test_loader, member_indices
 

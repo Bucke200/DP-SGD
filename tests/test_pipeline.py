@@ -444,3 +444,148 @@ def test_clipping_sweep_member_indices_match_epsilon_sweep():
         else:
             pytest.fail(f"No saved member index file found for seed {seed}")
 
+
+def test_epsilon_sweep_multiseed_json_entries():
+    """Verify that epsilon_sweep_multiseed.json exists and has an entry per (noise_multiplier, seed)."""
+    manifest_path = os.path.join(config.RESULTS_DIR, "epsilon_sweep_multiseed.json")
+    if not os.path.exists(manifest_path):
+        pytest.skip(f"epsilon_sweep_multiseed.json not found at {manifest_path}")
+
+    with open(manifest_path, "r") as f:
+        data = json.load(f)
+
+    expected_nms = [0.0, 0.3, 0.5, 0.7, 0.9, 1.1, 1.5, 2.0, 3.0, 5.0]
+    expected_seeds = [42, 43, 44]
+    expected_pairs = {(nm, s) for nm in expected_nms for s in expected_seeds}
+
+    found_pairs = set()
+    for nm_key, entry in data.items():
+        nm = float(entry.get("noise_multiplier", nm_key))
+        runs = entry.get("runs", [])
+        for r in runs:
+            s = int(r["seed"])
+            found_pairs.add((nm, s))
+
+    assert found_pairs == expected_pairs, (
+        f"Missing/extra (noise_multiplier, seed) pairs. Missing: {expected_pairs - found_pairs}, "
+        f"Extra: {found_pairs - expected_pairs}"
+    )
+
+
+def test_epsilon_sweep_multiseed_checkpoints_load():
+    """Verify that every checkpoint path exists and loads into a clean CifarCNN."""
+    manifest_path = os.path.join(config.RESULTS_DIR, "epsilon_sweep_multiseed.json")
+    if not os.path.exists(manifest_path):
+        pytest.skip(f"epsilon_sweep_multiseed.json not found at {manifest_path}")
+
+    with open(manifest_path, "r") as f:
+        data = json.load(f)
+
+    device = torch.device("cpu")
+    for nm_key, entry in data.items():
+        runs = entry.get("runs", [])
+        for r in runs:
+            ckpt_path = r.get("checkpoint_path") or r.get("checkpoint")
+            assert ckpt_path is not None, f"Missing checkpoint in {r}"
+            if not os.path.isabs(ckpt_path):
+                ckpt_path = os.path.abspath(ckpt_path)
+            assert os.path.exists(ckpt_path), f"Checkpoint does not exist: {ckpt_path}"
+
+            model = CifarCNN().to(device)
+            ckpt_data = torch.load(ckpt_path, map_location=device, weights_only=False)
+            state_dict = ckpt_data["model_state_dict"] if "model_state_dict" in ckpt_data else ckpt_data
+            state_dict = {k.replace("_module.", "", 1): v for k, v in state_dict.items()}
+            model.load_state_dict(state_dict)
+            model.eval()
+
+            dummy_x = torch.randn(2, 3, 32, 32)
+            out = model(dummy_x)
+            assert out.shape == (2, 10)
+
+
+def test_epsilon_consistency_across_seeds():
+    """Verify that epsilon is identical across seeds within each noise multiplier (tolerance 1e-6)."""
+    manifest_path = os.path.join(config.RESULTS_DIR, "epsilon_sweep_multiseed.json")
+    if not os.path.exists(manifest_path):
+        pytest.skip(f"epsilon_sweep_multiseed.json not found at {manifest_path}")
+
+    with open(manifest_path, "r") as f:
+        data = json.load(f)
+
+    for nm_key, entry in data.items():
+        nm = float(entry.get("noise_multiplier", nm_key))
+        if nm == 0.0:
+            continue
+        runs = entry.get("runs", [])
+        epsilons = [float(r["epsilon"]) for r in runs if r.get("epsilon") is not None]
+        assert len(epsilons) >= 2, f"Expected at least 2 seeds for nm={nm}, got {len(epsilons)}"
+        for eps in epsilons:
+            assert abs(eps - epsilons[0]) < 1e-6, (
+                f"Epsilon discrepancy for nm={nm}: {eps} vs {epsilons[0]}"
+            )
+
+
+def test_distinct_member_index_splits_per_seed():
+    """Verify each seed has a distinct member index file, and no two seeds share a split."""
+    import numpy as np
+    splits_dir = getattr(config, "SPLITS_DIR", "experiments/cifar10/splits")
+    n_train = getattr(config, "N_TRAIN", 5000)
+    seeds = [42, 43, 44]
+
+    splits = {}
+    for seed in seeds:
+        json_path = os.path.join(splits_dir, f"member_indices_n{n_train}_seed{seed}.json")
+        npy_path = os.path.join(splits_dir, f"member_indices_n{n_train}_seed{seed}.npy")
+        assert os.path.exists(json_path) or os.path.exists(npy_path), (
+            f"Missing member index file for seed {seed}"
+        )
+        if os.path.exists(json_path):
+            with open(json_path, "r") as f:
+                idx = np.array(json.load(f))
+        else:
+            idx = np.load(npy_path)
+        assert len(idx) == n_train
+        splits[seed] = set(idx.tolist())
+
+    for i in range(len(seeds)):
+        for j in range(i + 1, len(seeds)):
+            s1, s2 = seeds[i], seeds[j]
+            overlap = len(splits[s1] & splits[s2])
+            assert splits[s1] != splits[s2], f"Seed {s1} and {s2} have identical splits!"
+            # Subsampling 5000 from 50000 has expected overlap ~ 500, never 5000
+            assert overlap < n_train, f"Seed {s1} and {s2} completely share a split!"
+
+
+def test_seed42_values_match_original_single_seed_run():
+    """Verify seed-42 values in multiseed JSON match the original single-seed run."""
+    single_path = os.path.join(config.RESULTS_DIR, "epsilon_sweep.json")
+    multi_path = os.path.join(config.RESULTS_DIR, "epsilon_sweep_multiseed.json")
+    assert os.path.exists(single_path), f"epsilon_sweep.json not found at {single_path}"
+    if not os.path.exists(multi_path):
+        pytest.skip(f"epsilon_sweep_multiseed.json not found at {multi_path}")
+
+    with open(single_path, "r") as f:
+        single_data = json.load(f)
+    with open(multi_path, "r") as f:
+        multi_data = json.load(f)
+
+    single_by_nm = {}
+    for r in single_data:
+        nm = float(r["noise_multiplier"])
+        single_by_nm[nm] = r
+
+    for nm_key, entry in multi_data.items():
+        nm = float(entry.get("noise_multiplier", nm_key))
+        runs = entry.get("runs", [])
+        run_42 = next((r for r in runs if r["seed"] == 42), None)
+        assert run_42 is not None, f"Seed 42 not found for nm={nm}"
+        orig = single_by_nm[nm]
+        assert abs(run_42["test_accuracy"] - orig["test_accuracy"]) < 0.1, (
+            f"Accuracy mismatch for nm={nm}, seed 42: {run_42['test_accuracy']} vs {orig['test_accuracy']}"
+        )
+        if nm > 0.0:
+            assert abs(float(run_42["epsilon"]) - float(orig["epsilon"])) < 1e-4, (
+                f"Epsilon mismatch for nm={nm}, seed 42: {run_42['epsilon']} vs {orig['epsilon']}"
+            )
+
+
