@@ -22,8 +22,6 @@ data/
 .vscode/
 *.swp
 
-# Project Notes & Context
 PROJECT_CONTEXT.md
 PROGRESS_UPDATE.md
-PAPER.md
-paper.md
+PROJECT_UPDATE.md

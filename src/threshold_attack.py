@@ -114,6 +114,18 @@ def tpr_at_fpr(fpr: np.ndarray, tpr: np.ndarray, target: float) -> float:
 
 
 def attack_metrics(member_scores: np.ndarray, nonmember_scores: np.ndarray) -> dict:
+    member_scores = np.asarray(member_scores, dtype=np.float64)
+    nonmember_scores = np.asarray(nonmember_scores, dtype=np.float64)
+
+    assert np.all(np.isfinite(member_scores)), (
+        f"FATAL: NaN or Inf detected in member score array! "
+        f"NaN count: {np.isnan(member_scores).sum()}, Inf count: {np.isinf(member_scores).sum()}"
+    )
+    assert np.all(np.isfinite(nonmember_scores)), (
+        f"FATAL: NaN or Inf detected in nonmember score array! "
+        f"NaN count: {np.isnan(nonmember_scores).sum()}, Inf count: {np.isinf(nonmember_scores).sum()}"
+    )
+
     y = np.r_[np.ones_like(member_scores), np.zeros_like(nonmember_scores)]
     s = np.r_[member_scores, nonmember_scores]
 
@@ -147,40 +159,186 @@ def _output_is_log_probs(logits: torch.Tensor) -> bool:
     return bool(torch.allclose(total, torch.ones_like(total), atol=1e-3))
 
 
+def _prepare_inputs(
+    logits: torch.Tensor | np.ndarray, labels: torch.Tensor | np.ndarray
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Ensure logits and labels are PyTorch tensors with correct dtype."""
+    if isinstance(logits, np.ndarray):
+        logits = torch.from_numpy(logits)
+    if isinstance(labels, np.ndarray):
+        labels = torch.from_numpy(labels)
+    if not isinstance(logits, torch.Tensor) or not isinstance(labels, torch.Tensor):
+        logits = torch.as_tensor(logits, dtype=torch.float32)
+        labels = torch.as_tensor(labels, dtype=torch.long)
+    return logits, labels.long()
+
+
+def score_loss(
+    logits: torch.Tensor | np.ndarray, labels: torch.Tensor | np.ndarray
+) -> np.ndarray:
+    """
+    Negative cross-entropy loss membership score.
+    Higher score indicates MORE LIKELY MEMBER (training examples have lower loss).
+
+    Formula:
+        score_loss(x, y) = -CE(logits, y) = log p_theta(y | x)
+
+    Args:
+        logits: Model output logits or log-probabilities of shape (N, C).
+        labels: Ground truth class integer labels of shape (N,).
+
+    Returns:
+        1D numpy array of shape (N,) where HIGHER means MORE LIKELY MEMBER.
+    """
+    logits_t, labels_t = _prepare_inputs(logits, labels)
+    log_probs = _output_is_log_probs(logits_t)
+    logp = logits_t if log_probs else F.log_softmax(logits_t, dim=-1)
+
+    loss = F.nll_loss(logp, labels_t, reduction="none")
+    scores = (-loss).detach().cpu().numpy().astype(np.float64)
+
+    assert np.all(np.isfinite(scores)), (
+        f"score_loss: non-finite values encountered! "
+        f"NaNs: {np.isnan(scores).sum()}, Infs: {np.isinf(scores).sum()}"
+    )
+    return scores
+
+
+def score_confidence(
+    logits: torch.Tensor | np.ndarray, labels: torch.Tensor | np.ndarray
+) -> np.ndarray:
+    """
+    Softmax probability assigned to the true class.
+    Higher score indicates MORE LIKELY MEMBER (training examples typically have higher confidence).
+
+    Formula:
+        score_confidence(x, y) = p_theta(y | x) = exp(log p_theta(y | x))
+
+    Args:
+        logits: Model output logits or log-probabilities of shape (N, C).
+        labels: Ground truth class integer labels of shape (N,).
+
+    Returns:
+        1D numpy array of shape (N,) where HIGHER means MORE LIKELY MEMBER.
+    """
+    logits_t, labels_t = _prepare_inputs(logits, labels)
+    log_probs = _output_is_log_probs(logits_t)
+    logp = logits_t if log_probs else F.log_softmax(logits_t, dim=-1)
+
+    p = logp.exp().clamp(min=1e-12, max=1.0)
+    py = p.gather(1, labels_t.unsqueeze(1)).squeeze(1)
+    scores = py.detach().cpu().numpy().astype(np.float64)
+
+    assert np.all(np.isfinite(scores)), (
+        f"score_confidence: non-finite values encountered! "
+        f"NaNs: {np.isnan(scores).sum()}, Infs: {np.isinf(scores).sum()}"
+    )
+    return scores
+
+
+def score_mentr(
+    logits: torch.Tensor | np.ndarray, labels: torch.Tensor | np.ndarray
+) -> np.ndarray:
+    r"""
+    Negative modified prediction entropy (mentr) membership scoring signal.
+    Higher score indicates MORE LIKELY MEMBER.
+
+    Song & Mittal, "Systematic Evaluation of Privacy Risks of Machine Learning
+    Models" (USENIX Security 2021), Section 4 defines Modified Entropy (Mentr) as:
+        Mentr(f(x), y) = -(1 - f(x)_y) log(f(x)_y) - \sum_{i \ne y} f(x)_i log(1 - f(x)_i)
+    where f(x)_i is the predicted probability for class i, and y is the true label.
+
+    Because training samples (members) exhibit lower entropy (uncertainty) and higher
+    confidence on the true label, Mentr is lower for members than for non-members.
+    To satisfy the convention that HIGHER score indicates MORE LIKELY MEMBER:
+        score_mentr(f(x), y) = -Mentr(f(x), y)
+                             = (1 - f(x)_y) log(f(x)_y) + \sum_{i \ne y} f(x)_i log(1 - f(x)_i)
+
+    Numerical Stability:
+        - Evaluated with probabilities clamped away from 0: [1e-12, 1.0].
+        - Evaluated with (1 - p) clamped away from 0: [1e-12, 1.0] before logarithm.
+        - Runtime assertion guarantees that all score values are strictly finite (no NaN or Inf).
+
+    Args:
+        logits: Model output logits or log-probabilities of shape (N, C).
+        labels: Ground truth class integer labels of shape (N,).
+
+    Returns:
+        1D numpy array of shape (N,) where HIGHER means MORE LIKELY MEMBER.
+    """
+    logits_t, labels_t = _prepare_inputs(logits, labels)
+    log_probs = _output_is_log_probs(logits_t)
+    logp = logits_t if log_probs else F.log_softmax(logits_t, dim=-1)
+
+    p = logp.exp().clamp(min=1e-12, max=1.0)
+    py = p.gather(1, labels_t.unsqueeze(1)).squeeze(1)
+
+    one_minus_p = (1.0 - p).clamp(min=1e-12, max=1.0)
+    one_minus_py = one_minus_p.gather(1, labels_t.unsqueeze(1)).squeeze(1)
+
+    # Mentr calculation:
+    # term1 = -(1 - py) * log(py)
+    # term2 = -\sum_{i != y} p_i * log(1 - p_i) = -(\sum_{all i} p_i * log(1 - p_i) - py * log(1 - py))
+    # Mentr = term1 + term2 >= 0
+    # score = -Mentr <= 0 (higher for members)
+    term1 = -(1.0 - py) * torch.log(py)
+    sum_all = (p * torch.log(one_minus_p)).sum(dim=-1)
+    y_term = py * torch.log(one_minus_py)
+    term2 = -(sum_all - y_term)
+
+    m = term1 + term2
+    score = -m
+
+    scores = score.detach().cpu().numpy().astype(np.float64)
+    assert np.all(np.isfinite(scores)), (
+        f"score_mentr: non-finite values encountered! "
+        f"NaNs: {np.isnan(scores).sum()}, Infs: {np.isinf(scores).sum()}"
+    )
+    return scores
+
+
+SCORING_FUNCTIONS = {
+    "loss": score_loss,
+    "confidence": score_confidence,
+    "mentr": score_mentr,
+}
+
+
 @torch.no_grad()
 def score_dataset(model, loader, device, log_probs: bool | None = None) -> dict:
-    """Per-sample attack signals. Higher score = more member-like for all three."""
-    losses, confidences, mentr, correct = [], [], [], []
+    """Per-sample attack signals using pluggable scoring functions.
+    Higher score = more member-like for all three signals."""
+    all_logits = []
+    all_y = []
+    correct = []
 
     for x, y in loader:
         x, y = x.to(device), y.to(device)
         out = model(x)
-
-        if log_probs is None:
-            log_probs = _output_is_log_probs(out)
-            print(f"[info] model outputs detected as "
-                  f"{'log-probabilities' if log_probs else 'raw logits'}")
-
-        logp = out if log_probs else F.log_softmax(out, dim=1)
-        p = logp.exp().clamp(1e-12, 1.0)
-
-        loss = F.nll_loss(logp, y, reduction="none")
-        py = p.gather(1, y[:, None]).squeeze(1)
-
-        # Song & Mittal (2021) modified entropy: label-aware, lower = member.
-        one_minus_p = (1.0 - p).clamp(1e-12, 1.0)
-        m = -(1.0 - py) * torch.log(py) - (p * torch.log(one_minus_p)).sum(1) \
-            + py * torch.log(one_minus_p.gather(1, y[:, None]).squeeze(1))
-
-        losses.append(loss.cpu())
-        confidences.append(py.cpu())
-        mentr.append(m.cpu())
+        all_logits.append(out)
+        all_y.append(y)
         correct.append((out.argmax(1) == y).float().cpu())
 
+    logits = torch.cat(all_logits, dim=0)
+    labels = torch.cat(all_y, dim=0)
+
+    if log_probs is None:
+        log_probs = _output_is_log_probs(logits)
+        print(f"[info] model outputs detected as "
+              f"{'log-probabilities' if log_probs else 'raw logits'}")
+
+    loss_scores = score_loss(logits, labels)
+    conf_scores = score_confidence(logits, labels)
+    mentr_scores = score_mentr(logits, labels)
+
+    assert np.all(np.isfinite(loss_scores)), "NaN/Inf in loss scores"
+    assert np.all(np.isfinite(conf_scores)), "NaN/Inf in confidence scores"
+    assert np.all(np.isfinite(mentr_scores)), "NaN/Inf in mentr scores"
+
     return {
-        "loss": (-torch.cat(losses)).numpy(),        # low loss  -> member
-        "confidence": torch.cat(confidences).numpy(),  # high conf -> member
-        "mentr": (-torch.cat(mentr)).numpy(),          # low Mentr -> member
+        "loss": loss_scores,
+        "confidence": conf_scores,
+        "mentr": mentr_scores,
         "accuracy": float(torch.cat(correct).mean()),
         "_log_probs": log_probs,
     }

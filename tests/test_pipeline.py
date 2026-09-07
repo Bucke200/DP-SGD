@@ -589,3 +589,82 @@ def test_seed42_values_match_original_single_seed_run():
             )
 
 
+def test_seed42_baseline_regression_guard():
+    """
+    REGRESSION GUARD: The refactored loss signal must reproduce published numbers exactly.
+    Asserts seed-42 non-private baseline gives attack_auc = 0.8535 and
+    tpr_at_1pct_fpr = 0.0287 (tolerance 1e-4).
+    """
+    from pathlib import Path
+    from types import SimpleNamespace
+    from src.threshold_attack import (
+        load_model,
+        build_loaders,
+        score_dataset,
+        attack_metrics,
+        _load_config,
+    )
+    from src.utils import get_device
+
+    cfg = _load_config()
+    repo_root = Path(__file__).resolve().parents[1]
+    ckpt_path = repo_root / "experiments" / "cifar10" / "checkpoints" / "baseline_seed42.pt"
+    if not ckpt_path.exists():
+        pytest.skip(f"Baseline checkpoint not found at {ckpt_path}")
+
+    member_file = repo_root / "experiments" / "cifar10" / "splits" / "member_indices_n5000_seed42.npy"
+    if not member_file.exists():
+        member_file = repo_root / "experiments" / "cifar10" / "splits" / "member_indices.npy"
+    assert member_file.exists(), f"Member index file not found at {member_file}"
+
+    device = get_device()
+    args = SimpleNamespace(
+        data_root=cfg["DATA_ROOT"],
+        member_index_file=str(member_file),
+        n_samples=5000,
+        batch_size=getattr(config, "TEST_BATCH_SIZE", 1000),
+        num_workers=0,
+        seed=42,
+    )
+    m_ldr, nm_ldr, n = build_loaders(args, cfg)
+    model = load_model(ckpt_path, device)
+    mem = score_dataset(model, m_ldr, device)
+    non = score_dataset(model, nm_ldr, device, log_probs=mem["_log_probs"])
+
+    metrics = attack_metrics(mem["loss"], non["loss"])
+    auc = metrics["auc"]
+    tpr = metrics["tpr_at_fpr_0.01"]
+
+    # Tolerance 1e-4 regression guard
+    assert abs(auc - 0.8535) <= 1e-4, f"Regression guard failed: AUC {auc:.6f} != 0.8535 (tol 1e-4)"
+    assert abs(tpr - 0.0287) <= 1e-4, f"Regression guard failed: TPR@1%FPR {tpr:.6f} != 0.0287 (tol 1e-4)"
+
+
+def test_pluggable_scoring_functions_standalone():
+    """Verify pluggable scoring functions take (logits, labels) and return finite 1D arrays."""
+    import numpy as np
+    import torch
+    from src.threshold_attack import score_loss, score_confidence, score_mentr, SCORING_FUNCTIONS
+
+    # Test with torch.Tensor
+    logits = torch.randn(20, 10)
+    labels = torch.randint(0, 10, (20,))
+
+    for name, fn in SCORING_FUNCTIONS.items():
+        scores = fn(logits, labels)
+        assert isinstance(scores, np.ndarray), f"{name} should return numpy ndarray"
+        assert scores.shape == (20,), f"{name} expected shape (20,), got {scores.shape}"
+        assert np.all(np.isfinite(scores)), f"{name} produced non-finite values"
+
+    # Test with np.ndarray
+    logits_np = np.random.randn(15, 10).astype(np.float32)
+    labels_np = np.random.randint(0, 10, size=15)
+
+    for name, fn in [("loss", score_loss), ("confidence", score_confidence), ("mentr", score_mentr)]:
+        scores = fn(logits_np, labels_np)
+        assert isinstance(scores, np.ndarray)
+        assert scores.shape == (15,)
+        assert np.all(np.isfinite(scores))
+
+
+
