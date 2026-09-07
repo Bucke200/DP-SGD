@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use this software or findings in your research, please cite it as below."
+title: "Empirical Deconstruction of DP-SGD: Clipping-Induced Underfitting as the Primary Driver of Threshold MIA Defense"
+authors:
+  - family-names: "Panja"
+    given-names: "Srinjay"
+date-released: 2026-09-07
+url: "https://github.com/Bucke200/DP-SGD"
+repository-code: "https://github.com/Bucke200/DP-SGD"
+license: "MIT"
+type: "article"

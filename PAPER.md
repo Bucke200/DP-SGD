@@ -1,4 +1,4 @@
-# Deconstructing DP-SGD: Empirical Membership Privacy Under Threshold Attacks Stems from Clipping-Induced Underfitting, Not Noise Injection
+# Empirical Deconstruction of DP-SGD: Clipping-Induced Underfitting as the Primary Driver of Threshold MIA Defense
 
 **Authors**: Undergraduate Research Team led by Srinjay Panja
 **Code & Data Repository**: `https://github.com/Bucke200/DP-SGD` (PyTorch + Opacus)  

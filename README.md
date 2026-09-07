@@ -1,9 +1,9 @@
-# Deconstructing DP-SGD: Empirical Membership Privacy Under Threshold Attacks Stems from Clipping-Induced Underfitting, Not Noise Injection
+# Empirical Deconstruction of DP-SGD: Clipping-Induced Underfitting as the Primary Driver of Threshold MIA Defense
 
 Undergraduate research project evaluating the empirical relationship between **Differential Privacy (DP-SGD)**, **model utility**, and **vulnerability to Membership Inference Attacks (MIA)** across MNIST and CIFAR-10 using PyTorch and Opacus.
 
 > [!NOTE]
-> **Research Manuscript**: The complete paper is available in [`PAPER.md`](PAPER.md): *Deconstructing DP-SGD: Empirical Membership Privacy Under Threshold Attacks Stems from Clipping-Induced Underfitting, Not Noise Injection*.
+> **Research Manuscript**: The complete paper is available in [`PAPER.md`](PAPER.md): *Empirical Deconstruction of DP-SGD: Clipping-Induced Underfitting as the Primary Driver of Threshold MIA Defense*.
 
 MNIST serves as a control case (the model generalizes too well for MIA to find signal). CIFAR-10 is the primary evaluation dataset, where a subsampled training set and extended training produce a natural memorization gap that enables meaningful MIA results.
 
@@ -26,6 +26,8 @@ MNIST serves as a control case (the model generalizes too well for MIA to find s
 - [Final Thoughts & Research Takeaways](#final-thoughts--research-takeaways)
 - [Checkpoint Format](#checkpoint-format)
 - [Research Objectives & Roadmap](#research-objectives--roadmap)
+- [Citation](#citation)
+- [License](#license)
 
 ---
 
@@ -471,3 +473,25 @@ Weights load directly into the appropriate model class (`SampleCNN` or `CifarCNN
 - [x] **Multi-seed validation**: 3 seeds across both epsilon sweep (10 conditions, 30 checkpoints) and clipping configurations for statistical confidence intervals
 - [ ] **Shadow model attack**: Train shadow models to learn non-linear decision boundaries
 - [ ] **LiRA**: Likelihood Ratio Attack across per-sample out-of-bag models
+
+---
+
+## Citation
+
+If you find this codebase, empirical benchmarks, or research findings useful in your work, please cite:
+
+```bibtex
+@article{panja2026dpsgd,
+  title   = {Empirical Deconstruction of DP-SGD: Clipping-Induced Underfitting as the Primary Driver of Threshold MIA Defense},
+  author  = {Panja, Srinjay and contributors},
+  journal = {arXiv preprint},
+  year    = {2026},
+  url     = {https://github.com/Bucke200/DP-SGD}
+}
+```
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE) - see the [`LICENSE`](LICENSE) file for details.
