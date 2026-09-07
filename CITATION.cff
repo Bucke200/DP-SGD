@@ -8,4 +8,12 @@ date-released: 2026-09-07
 url: "https://github.com/Bucke200/DP-SGD"
 repository-code: "https://github.com/Bucke200/DP-SGD"
 license: "MIT"
-type: "article"
+type: software
+preferred-citation:
+  type: article
+  authors:
+    - family-names: "Panja"
+      given-names: "Srinjay"
+  title: "Empirical Deconstruction of DP-SGD: Clipping-Induced Underfitting as the Primary Driver of Threshold MIA Defense"
+  year: 2026
+  url: "https://github.com/Bucke200/DP-SGD"
