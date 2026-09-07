@@ -1,6 +1,6 @@
 # Empirical Deconstruction of DP-SGD: Clipping-Induced Underfitting as the Primary Driver of Threshold MIA Defense
 
-**Authors**: Undergraduate Research Team led by Srinjay Panja
+**Authors**: Srinjay Panja et al.
 **Code & Data Repository**: `https://github.com/Bucke200/DP-SGD` (PyTorch + Opacus)  
 **Primary Artifacts**: 45 Evaluated Checkpoints across MNIST & Subsampled CIFAR-10 (Seeds 42, 43, 44)
 
