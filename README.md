@@ -484,7 +484,6 @@ If you find this codebase, empirical benchmarks, or research findings useful in 
 @article{panja2026dpsgd,
   title   = {Empirical Deconstruction of DP-SGD: Clipping-Induced Underfitting as the Primary Driver of Threshold MIA Defense},
   author  = {Panja, Srinjay and others},
-  journal = {arXiv preprint},
   year    = {2026},
   url     = {https://github.com/Bucke200/DP-SGD}
 }
@@ -494,4 +493,4 @@ If you find this codebase, empirical benchmarks, or research findings useful in 
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE) - see the [`LICENSE`](LICENSE) file for details.
+This project is licensed under the [MIT License](LICENSE) - see the [`LICENSE`](LICENSE) file for details.
